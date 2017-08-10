@@ -3,51 +3,58 @@ package reflect.internal.util
 
 import scala.collection.mutable
 
-object Statistics {
+import java.lang.invoke.{SwitchPoint, MutableCallSite, MethodHandle, MethodHandles, MethodType}
+
+object StatisticsHelper {
+  /** Represents the method handle for a parameterless method returning a primitive boolean. */
+  final val BooleanMethodType: MethodType = MethodType.methodType(classOf[Boolean]).unwrap
+}
+
+object Statistics extends MutableCallSite(StatisticsHelper.BooleanMethodType) {
 
   type TimerSnapshot = (Long, Long)
 
   /** If enabled, increment counter by one */
   @inline final def incCounter(c: Counter) {
-    if (_enabled && c != null) c.value += 1
+    if (canEnable && c != null) c.value += 1
   }
 
   /** If enabled, increment counter by given delta */
   @inline final def incCounter(c: Counter, delta: Int) {
-    if (_enabled && c != null) c.value += delta
+    if (canEnable && c != null) c.value += delta
   }
 
   /** If enabled, increment counter in map `ctrs` at index `key` by one */
   @inline final def incCounter[K](ctrs: QuantMap[K, Counter], key: K) =
-    if (_enabled && ctrs != null) ctrs(key).value += 1
+    if (canEnable && ctrs != null) ctrs(key).value += 1
 
   /** If enabled, start subcounter. While active it will track all increments of
    *  its base counter.
    */
   @inline final def startCounter(sc: SubCounter): (Int, Int) =
-    if (_enabled && sc != null) sc.start() else null
+    if (canEnable && sc != null) sc.start() else null
 
   /** If enabled, stop subcounter from tracking its base counter. */
   @inline final def stopCounter(sc: SubCounter, start: (Int, Int)) {
-    if (_enabled && sc != null) sc.stop(start)
+    if (canEnable && sc != null) sc.stop(start)
   }
 
   /** If enabled, start timer */
   @inline final def startTimer(tm: Timer): TimerSnapshot =
-    if (_enabled && tm != null) tm.start() else null
+    if (canEnable && tm != null) tm.start() else null
 
   /** If enabled, stop timer */
   @inline final def stopTimer(tm: Timer, start: TimerSnapshot) {
-    if (_enabled && tm != null) tm.stop(start)
+    if (canEnable && tm != null) tm.stop(start)
   }
 
   /** If enabled, push and start a new timer in timer stack */
   @inline final def pushTimer(timers: TimerStack, timer: => StackableTimer): TimerSnapshot =
-    if (_enabled && timers != null) timers.push(timer) else null
+    if (canEnable && timers != null) timers.push(timer) else null
 
   /** If enabled, stop and pop timer from timer stack */
   @inline final def popTimer(timers: TimerStack, prev: TimerSnapshot) {
-    if (_enabled && timers != null) timers.pop(prev)
+    if (canEnable && timers != null) timers.pop(prev)
   }
 
   /** Create a new counter that shows as `prefix` and is active in given phases */
@@ -250,13 +257,47 @@ quant)
   private var _enabled = false
   private val qs = new mutable.HashMap[String, Quantity]
 
-  /** replace with
-   *
-   *    final val canEnable = false
-   *
-   *  to remove all Statistics code from build
+  private var switchPoint: SwitchPoint = new SwitchPoint()
+  private final val DefaultHandle: MethodHandle = {
+    val handle = MethodHandles.lookup().findVirtual(this.getClass, "defaultValue", StatisticsHelper.BooleanMethodType)
+    val bounded = handle.bindTo(this)
+    setTarget(bounded)
+    bounded
+  }
+
+  final def defaultValue: Boolean = synchronized {
+    val constantHandle = MethodHandles.constant(classOf[Boolean], this._enabled)
+    val efficientIf: MethodHandle = switchPoint.guardWithTest(constantHandle, DefaultHandle)
+    setTarget(efficientIf)
+    _enabled
+  }
+
+  final def setValue(value: Boolean): Unit = synchronized {
+    val previousSwitchPoint = switchPoint
+    this._enabled = value
+    switchPoint = new SwitchPoint()
+    SwitchPoint.invalidateAll(Array(previousSwitchPoint))
+  }
+
+  private final val IsEnabledGetter = this.dynamicInvoker()
+
+  /**
+   * Represents whether statistics can or cannot be enabled.
+   * 
+   * The implementation of this method relies on the runtime JVM machinery of switchpoints,
+   * callsites and method handles to allow the JVM to speculatively assume that `canEnable`
+   * is a final method most of the cases. This is not the case when the user passes in the
+   * family of `-Ystatistics` flags. The benefit of this approach is that the JVM can speculate
+   * on the default value of `canEnable` and optimize away the if checks required for statistics.
+   * 
+   * This implementation is inspired by Rémi Forax's work in JSR292 and was suggested by Jason.
+   * References:
+   * 1. https://community.oracle.com/blogs/forax/2011/12/17/jsr-292-goodness-almost-static-final-field
+   * 2. https://github.com/scala/scala-dev/issues/149
+   * 
+   * By default, statistics are completely turned off.
    */
-  final def canEnable = _enabled
+  final def canEnable: Boolean = IsEnabledGetter.invoke().asInstanceOf[Boolean]
 
   /** replace with
    *
@@ -267,9 +308,9 @@ quant)
    */
   final val hotEnabled = false
 
-  def enabled = _enabled
+  @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
-    if (cond && !_enabled) {
+    if (cond && !canEnable) {
       val start = System.nanoTime()
       var total = 0L
       for (i <- 1 to 10000) {
@@ -277,9 +318,10 @@ quant)
         total += System.nanoTime() - time
       }
       val total2 = System.nanoTime() - start
+      // Shouldn't we replace this println with a `reporter.info`?
       println("Enabling statistics, measuring overhead = "+
               total/10000.0+"ns to "+total2/10000.0+"ns per timer")
-      _enabled = true
+      this.setValue(true)
     }
   }
 }
