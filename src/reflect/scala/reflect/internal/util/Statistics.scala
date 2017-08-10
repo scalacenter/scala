@@ -297,7 +297,7 @@ quant)
    * 
    * By default, statistics are completely turned off.
    */
-  final def canEnable: Boolean = IsEnabledGetter.invoke().asInstanceOf[Boolean]
+  @inline final def canEnable: Boolean = IsEnabledGetter.invoke().asInstanceOf[Boolean]
 
   /** replace with
    *
