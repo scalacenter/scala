@@ -254,7 +254,7 @@ quant)
     }
   }
 
-  private var _enabled = false
+  private final val _enabled = false
   private val qs = new mutable.HashMap[String, Quantity]
 
   private var switchPoint: SwitchPoint = new SwitchPoint()
@@ -272,12 +272,12 @@ quant)
     _enabled
   }
 
-  final def setValue(value: Boolean): Unit = synchronized {
+/*   final def setValue(value: Boolean): Unit = synchronized {
     val previousSwitchPoint = switchPoint
     this._enabled = value
     switchPoint = new SwitchPoint()
     SwitchPoint.invalidateAll(Array(previousSwitchPoint))
-  }
+  } */
 
   private final val IsEnabledGetter = this.dynamicInvoker()
 
@@ -321,7 +321,7 @@ quant)
       // Shouldn't we replace this println with a `reporter.info`?
       println("Enabling statistics, measuring overhead = "+
               total/10000.0+"ns to "+total2/10000.0+"ns per timer")
-      this.setValue(true)
+      //this.setValue(true)
     }
   }
 }
