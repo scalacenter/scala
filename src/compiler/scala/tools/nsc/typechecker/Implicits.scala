@@ -366,7 +366,10 @@ trait Implicits {
     }
 
     import infer._
-    if (Statistics.canEnable) Statistics.incCounter(implicitSearchCount)
+    if (Statistics.canEnable) {
+      if (openMacros.nonEmpty) Statistics.incCounter(macroImplicits)
+      Statistics.incCounter(implicitSearchCount)
+    }
 
     /** The type parameters to instantiate */
     val undetParams = if (isView) Nil else context.outer.undetparams
@@ -1568,6 +1571,7 @@ object ImplicitsStats {
   val matchingImplicits   = Statistics.newSubCounter("  #matching", implicitSearchCount)
   val typedImplicits      = Statistics.newSubCounter("  #typed", implicitSearchCount)
   val foundImplicits      = Statistics.newSubCounter("  #found", implicitSearchCount)
+  val macroImplicits      = Statistics.newSubCounter("  #macros", implicitSearchCount)
   val improvesCount       = Statistics.newSubCounter("implicit improves tests", implicitSearchCount)
   val improvesCachedCount = Statistics.newSubCounter("#implicit improves cached ", implicitSearchCount)
   val inscopeImplicitHits = Statistics.newSubCounter("#implicit inscope hits", implicitSearchCount)
