@@ -295,18 +295,24 @@ quant)
    * 1. https://community.oracle.com/blogs/forax/2011/12/17/jsr-292-goodness-almost-static-final-field
    * 2. https://github.com/scala/scala-dev/issues/149
    * 
-   * By default, statistics are completely turned off.
+   * By default, statistics are completely turned off. If you want to enable them, set
+   * `_enabled` to true.
    */
   @inline final def canEnable: Boolean = IsEnabledGetter.invoke().asInstanceOf[Boolean]
 
-  /** replace with
-   *
-   *   final def hotEnabled = _enabled
-   *
-   * and rebuild, to also count tiny but super-hot methods
-   * such as phase, flags, owner, name.
+  /**
+   * Defines whether statistics about tiny but super-hot methods such as phase, flags,
+   * owner, name and similar compiler internal should be recorded.
+   * 
+   * Note two things:
+   *   - Unlike before, recording statistics will also record this information.
+   *   - It uses the same switchpoint speculation technique as `canEnable` to make its
+   *     access efficient. See docs in `canEnable` for details.
+   * 
+   * By default, statistics are completely turned off. If you want to enable them, set
+   * `_enabled` to true.
    */
-  final val hotEnabled = false
+  @inline final def hotEnabled = canEnable
 
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
