@@ -307,7 +307,7 @@ quant)
    * By default, statistics are completely turned off. If you want to enable them, set
    * `_enabled` to true.
    */
-  @inline final def hotEnabled = canEnable
+  final val hotEnabled = false
 
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
