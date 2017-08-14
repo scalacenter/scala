@@ -254,8 +254,7 @@ quant)
 
   private var switchPoint: SwitchPoint = new SwitchPoint()
   private final val DefaultHandle: MethodHandle = {
-    val handle = MethodHandles.lookup().findVirtual(this.getClass, "defaultValue", StatisticsHelper.BOOLEAN_METHOD_TYPE)
-    val bounded = handle.bindTo(this)
+    val bounded = StatisticsHelper.DEFAULT_METHOD_HANDLE.bindTo(this)
     super.setTarget(bounded)
     bounded
   }
