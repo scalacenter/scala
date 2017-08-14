@@ -294,20 +294,6 @@ quant)
    */
   @inline final def canEnable: Boolean = IsEnabledGetter.invoke().asInstanceOf[Boolean]
 
-  /**
-   * Defines whether statistics about tiny but super-hot methods such as phase, flags,
-   * owner, name and similar compiler internal should be recorded.
-   * 
-   * Note two things:
-   *   - Unlike before, recording statistics will also record this information.
-   *   - It uses the same switchpoint speculation technique as `canEnable` to make its
-   *     access efficient. See docs in `canEnable` for details.
-   * 
-   * By default, statistics are completely turned off. If you want to enable them, set
-   * `_enabled` to true.
-   */
-  final val hotEnabled = false
-
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
     if (cond && !canEnable) {
