@@ -3,14 +3,9 @@ package reflect.internal.util
 
 import scala.collection.mutable
 
-import java.lang.invoke.{SwitchPoint, MutableCallSite, MethodHandle, MethodHandles, MethodType}
+import java.lang.invoke.{SwitchPoint, MethodHandle, MethodHandles, MethodType}
 
-object StatisticsHelper {
-  /** Represents the method handle for a parameterless method returning a primitive boolean. */
-  final val BooleanMethodType: MethodType = MethodType.methodType(classOf[Boolean]).unwrap
-}
-
-object Statistics extends MutableCallSite(StatisticsHelper.BooleanMethodType) {
+object Statistics extends StatisticsHelper {
 
   type TimerSnapshot = (Long, Long)
 
@@ -259,9 +254,9 @@ quant)
 
   private var switchPoint: SwitchPoint = new SwitchPoint()
   private final val DefaultHandle: MethodHandle = {
-    val handle = MethodHandles.lookup().findVirtual(this.getClass, "defaultValue", StatisticsHelper.BooleanMethodType)
+    val handle = MethodHandles.lookup().findVirtual(this.getClass, "defaultValue", StatisticsHelper.BOOLEAN_METHOD_TYPE)
     val bounded = handle.bindTo(this)
-    setTarget(bounded)
+    super.setTarget(bounded)
     bounded
   }
 
