@@ -254,7 +254,7 @@ quant)
     }
   }
 
-  private var _enabled = false
+  private var _enabled = true
   private val qs = new mutable.HashMap[String, Quantity]
 
   private var switchPoint: SwitchPoint = new SwitchPoint()
