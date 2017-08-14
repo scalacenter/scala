@@ -311,6 +311,12 @@ quant)
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
     if (cond && !canEnable) {
+      this.setValue(true)
+    }
+  }
+
+  import scala.reflect.internal.Reporter
+  def reportStatisticsOverhead(reporter: Reporter): Unit = {
       val start = System.nanoTime()
       var total = 0L
       for (i <- 1 to 10000) {
@@ -318,10 +324,7 @@ quant)
         total += System.nanoTime() - time
       }
       val total2 = System.nanoTime() - start
-      // Shouldn't we replace this println with a `reporter.info`?
-      println("Enabling statistics, measuring overhead = "+
-              total/10000.0+"ns to "+total2/10000.0+"ns per timer")
-      this.setValue(true)
-    }
+      val variation = s"${total/10000.0}ns to ${total2/10000.0}ns"
+      reporter.echo(NoPosition, s"Enabling statistics, measuring overhead = $variation per timer")
   }
 }

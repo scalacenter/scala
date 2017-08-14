@@ -379,7 +379,9 @@ trait ScalaSettings extends AbsScalaSettings
       descr   = description,
       domain  = YstatisticsPhases,
       default = Some(List("_"))
-    ) withPostSetHook { _ => scala.reflect.internal.util.Statistics.enabled = true }
+    ) withPostSetHook { _ =>
+      scala.reflect.internal.util.Statistics.enabled = true
+    }
   }
 
   def YstatisticsEnabled = Ystatistics.value.nonEmpty
