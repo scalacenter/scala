@@ -59,9 +59,15 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
    *  Mirrors with runtime definitions (e.g. Repl) need to adjust this method.
    */
   protected def findMacroClassLoader(): ClassLoader = {
-    val classpath = global.classPath.asURLs
-    macroLogVerbose("macro classloader: initializing from -cp: %s".format(classpath))
-    ScalaClassLoader.fromURLs(classpath, self.getClass.getClassLoader)
+    val start = if (Statistics.canEnable) Statistics.startTimer(macroClassloading) else null
+    try {
+      val classpath = global.classPath.asURLs
+      macroLogVerbose("macro classloader: initializing from -cp: %s".format(classpath))
+      ScalaClassLoader.fromURLs(classpath, self.getClass.getClassLoader)
+    } finally {
+      if (Statistics.canEnable)
+        Statistics.stopTimer(macroClassloading, start)
+    }
   }
 
   /** `MacroImplBinding` and its companion module are responsible for
@@ -915,6 +921,7 @@ object MacrosStats {
   import scala.reflect.internal.TypesStats.typerNanos
   val macroExpandCount    = Statistics.newCounter ("#macro expansions", "typer")
   val macroExpandNanos    = Statistics.newSubTimer("time spent in macroExpand", typerNanos)
+  val macroClassloading   = Statistics.newTimer("time spent classloading macros")
 }
 
 class Fingerprint private[Fingerprint](val value: Int) extends AnyVal {
