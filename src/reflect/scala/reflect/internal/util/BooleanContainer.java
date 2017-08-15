@@ -3,6 +3,14 @@ package scala.reflect.internal.util;
 import scala.reflect.internal.util.AlmostFinalValue;
 import java.lang.invoke.MethodHandle;
 
+/**
+ * Represents a container with a boolean value that tells the compiler whether
+ * an option is enabled or not. This class is used for configuration purposes
+ * (see scala.reflect.internal.util.Statistics).
+ * 
+ * Its implementation delegates to {@link scala.reflect.internal.util.AlmostFinalValue},
+ * which helps performance (see docs to find out why).
+ */
 public class BooleanContainer {
   private final boolean value;
 

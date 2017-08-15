@@ -253,20 +253,6 @@ quant)
 
   /**
    * Represents whether statistics can or cannot be enabled.
-   * 
-   * The implementation of this method relies on the runtime JVM machinery of switchpoints,
-   * callsites and method handles to allow the JVM to speculatively assume that `canEnable`
-   * is a final method most of the cases. This is not the case when the user passes in the
-   * family of `-Ystatistics` flags. The benefit of this approach is that the JVM can speculate
-   * on the default value of `canEnable` and optimize away the if checks required for statistics.
-   * 
-   * This implementation is inspired by Rémi Forax's work in JSR292 and was suggested by Jason.
-   * References:
-   * 1. https://community.oracle.com/blogs/forax/2011/12/17/jsr-292-goodness-almost-static-final-field
-   * 2. https://github.com/scala/scala-dev/issues/149
-   * 
-   * By default, statistics are completely turned off. If you want to enable them, set
-   * `_enabled` to true.
    */
   @inline final def canEnable: Boolean =
     BooleanContainer.getDefault().isEnabled()
@@ -274,12 +260,12 @@ quant)
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
     if (cond && !canEnable) {
-      //this.setValue(true)
       BooleanContainer.enable()
     }
   }
 
   import scala.reflect.internal.Reporter
+  /** Reports the overhead of measuring statistics via the nanoseconds variation. */
   def reportStatisticsOverhead(reporter: Reporter): Unit = {
       val start = System.nanoTime()
       var total = 0L
