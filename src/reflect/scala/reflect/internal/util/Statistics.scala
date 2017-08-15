@@ -5,7 +5,7 @@ import scala.collection.mutable
 
 import java.lang.invoke.{SwitchPoint, MethodHandle, MethodHandles, MethodType}
 
-object Statistics extends StatisticsHelper {
+object Statistics {
 
   type TimerSnapshot = (Long, Long)
 
@@ -249,32 +249,7 @@ quant)
     }
   }
 
-/*   private var _enabled: BooleanContainer = false */
   private val qs = new mutable.HashMap[String, Quantity]
-
-/*   private var switchPoint: SwitchPoint = new SwitchPoint()
-  private final val DefaultHandle: MethodHandle = {
-    val bounded = StatisticsHelper.DEFAULT_METHOD_HANDLE.bindTo(this)
-    super.setTarget(bounded)
-    bounded
-  } */
-
-  final def defaultValue: Boolean = synchronized {
-/*     val constantHandle = MethodHandles.constant(classOf[Boolean], this._enabled)
-    val efficientIf: MethodHandle = switchPoint.guardWithTest(constantHandle, DefaultHandle)
-    setTarget(efficientIf)
-    _enabled */
-    true
-  }
-
-/*   final def setValue(value: Boolean): Unit = synchronized {
-    val previousSwitchPoint = switchPoint
-    this._enabled = value
-    switchPoint = new SwitchPoint()
-    SwitchPoint.invalidateAll(Array(previousSwitchPoint))
-  }
-
-  private final val IsEnabledGetter = this.dynamicInvoker() */
 
   /**
    * Represents whether statistics can or cannot be enabled.
