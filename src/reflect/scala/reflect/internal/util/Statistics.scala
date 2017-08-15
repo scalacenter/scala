@@ -249,31 +249,32 @@ quant)
     }
   }
 
-  private var _enabled = false
+/*   private var _enabled: BooleanContainer = false */
   private val qs = new mutable.HashMap[String, Quantity]
 
-  private var switchPoint: SwitchPoint = new SwitchPoint()
+/*   private var switchPoint: SwitchPoint = new SwitchPoint()
   private final val DefaultHandle: MethodHandle = {
     val bounded = StatisticsHelper.DEFAULT_METHOD_HANDLE.bindTo(this)
     super.setTarget(bounded)
     bounded
-  }
+  } */
 
   final def defaultValue: Boolean = synchronized {
-    val constantHandle = MethodHandles.constant(classOf[Boolean], this._enabled)
+/*     val constantHandle = MethodHandles.constant(classOf[Boolean], this._enabled)
     val efficientIf: MethodHandle = switchPoint.guardWithTest(constantHandle, DefaultHandle)
     setTarget(efficientIf)
-    _enabled
+    _enabled */
+    true
   }
 
-  final def setValue(value: Boolean): Unit = synchronized {
+/*   final def setValue(value: Boolean): Unit = synchronized {
     val previousSwitchPoint = switchPoint
     this._enabled = value
     switchPoint = new SwitchPoint()
     SwitchPoint.invalidateAll(Array(previousSwitchPoint))
   }
 
-  private final val IsEnabledGetter = this.dynamicInvoker()
+  private final val IsEnabledGetter = this.dynamicInvoker() */
 
   /**
    * Represents whether statistics can or cannot be enabled.
@@ -292,12 +293,14 @@ quant)
    * By default, statistics are completely turned off. If you want to enable them, set
    * `_enabled` to true.
    */
-  @inline final def canEnable: Boolean = IsEnabledGetter.invoke().asInstanceOf[Boolean]
+  @inline final def canEnable: Boolean =
+    BooleanContainer.getDefault().isEnabled()
 
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
     if (cond && !canEnable) {
-      this.setValue(true)
+      //this.setValue(true)
+      BooleanContainer.enable()
     }
   }
 
