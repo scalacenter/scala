@@ -1418,26 +1418,32 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       }
     }
 
+    import scala.reflect.internal.util.Statistics
+    private final val GlobalPhaseName = "global (synthetic)"
+    protected final val totalCompileTime = Statistics.newTimer("#total compile time", GlobalPhaseName)
+
     def compileUnits(units: List[CompilationUnit], fromPhase: Phase): Unit =  compileUnitsInternal(units,fromPhase)
     private def compileUnitsInternal(units: List[CompilationUnit], fromPhase: Phase) {
-      def currentTime = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
-
       units foreach addUnit
-      val startTime = currentTime
-
       reporter.reset()
       warnDeprecatedAndConflictingSettings()
       globalPhase = fromPhase
 
+      val timePhases = Statistics.canEnable || settings.verbose
+      val startTotal = if (timePhases) Statistics.startTimer(totalCompileTime) else null
+
       while (globalPhase.hasNext && !reporter.hasErrors) {
-        val startTime = currentTime
         phase = globalPhase
+        val phaseTimer = Statistics.newSubTimer(s"  ${phase.name}", totalCompileTime)
+        val startPhase = if (timePhases) Statistics.startTimer(phaseTimer) else null
+
         val profileBefore=profiler.beforePhase(phase)
-        globalPhase.run()
+        try globalPhase.run()
+        finally if (timePhases) Statistics.stopTimer(phaseTimer, startPhase) else ()
         profiler.afterPhase(phase, profileBefore)
 
         // progress update
-        informTime(globalPhase.description, startTime)
+        informTime(globalPhase.description, phaseTimer.nanos)
         if ((settings.Xprint containsPhase globalPhase) || settings.printLate && runIsAt(cleanupPhase)) {
           // print trees
           if (settings.Xshowtrees || settings.XshowtreesCompact || settings.XshowtreesStringified) nodePrinters.printAll()
@@ -1490,7 +1496,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       }
       symSource.keys foreach (x => resetPackageClass(x.owner))
 
-      informTime("total", startTime)
+      if (timePhases) {
+        Statistics.stopTimer(totalCompileTime, startTotal)
+        informTime("total", totalCompileTime.nanos)
+        inform("*** Cumulative timers for phases")
+        for (q <- Statistics.allQuantities if q.phases.nonEmpty && q.showAt(GlobalPhaseName))
+          inform(q.line)
+      }
 
       // Clear any sets or maps created via perRunCaches.
       perRunCaches.clearAll()
