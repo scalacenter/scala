@@ -251,17 +251,25 @@ quant)
 
   private val qs = new mutable.HashMap[String, Quantity]
 
-  /**
-   * Represents whether statistics can or cannot be enabled.
-   */
-  @inline final def canEnable: Boolean = StaticStatistics.isEnabled()
+  /** Represents whether normal statistics can or cannot be enabled. */
+  @inline final def canEnable: Boolean = StatisticsStatics.areColdStatsEnabled()
 
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
     if (cond && !canEnable) {
-      StaticStatistics.enable()
+      StatisticsStatics.enableColdStats()
     } else if (!cond && canEnable) {
-      StaticStatistics.disable()
+      StatisticsStatics.disableColdStats()
+    }
+  }
+
+  /** Represents whether hot statistics can or cannot be enabled. */
+  @inline def hotEnabled: Boolean = canEnable && StatisticsStatics.areHotStatsEnabled()
+  def hotEnabled_=(cond: Boolean) = {
+    if (cond && !hotEnabled) {
+      StatisticsStatics.enableHotStats()
+    } else if (!cond && hotEnabled) {
+      StatisticsStatics.disableHotStats()
     }
   }
 
