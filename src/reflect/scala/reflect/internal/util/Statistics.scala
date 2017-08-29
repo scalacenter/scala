@@ -254,13 +254,14 @@ quant)
   /**
    * Represents whether statistics can or cannot be enabled.
    */
-  @inline final def canEnable: Boolean =
-    BooleanContainer.getDefault().isEnabled()
+  @inline final def canEnable: Boolean = StaticStatistics.isEnabled()
 
   @inline def enabled = canEnable
   def enabled_=(cond: Boolean) = {
     if (cond && !canEnable) {
-      BooleanContainer.enable()
+      StaticStatistics.enable()
+    } else if (!cond && canEnable) {
+      StaticStatistics.disable()
     }
   }
 

@@ -11,51 +11,51 @@ import java.lang.invoke.MethodHandle;
  * Its implementation delegates to {@link scala.reflect.internal.util.AlmostFinalValue},
  * which helps performance (see docs to find out why).
  */
-public class BooleanContainer {
+public class StaticStatistics {
   private final boolean value;
 
-  public BooleanContainer(boolean value) {
+  public StaticStatistics(boolean value) {
     this.value = value;
   }
   
-  public boolean isEnabled() {
+  public boolean isEnabledNow() {
     return value;
   }
 
-  protected final static class TrueBooleanContainer extends BooleanContainer {
-    TrueBooleanContainer() {
+  protected final static class EnabledStatistics extends StaticStatistics {
+    EnabledStatistics() {
         super(true);
     }
   }
 
-  protected final static class FalseBooleanContainer extends BooleanContainer {
-    FalseBooleanContainer() {
+  protected final static class DisabledStatistics extends StaticStatistics {
+    DisabledStatistics() {
         super(false);
     }
   }
   
-  private static final AlmostFinalValue<BooleanContainer> DEFAULT_VALUE = new AlmostFinalValue<BooleanContainer>() {
+  private static final AlmostFinalValue<StaticStatistics> DEFAULT_VALUE = new AlmostFinalValue<StaticStatistics>() {
     @Override
-    protected BooleanContainer initialValue() {
-        return new FalseBooleanContainer();
+    protected StaticStatistics initialValue() {
+        return new DisabledStatistics();
     }
   };
 
   private static final MethodHandle DEFAULT_VALUE_GETTER = DEFAULT_VALUE.createGetter();
   
-  public static BooleanContainer getDefault() {
+  public static boolean isEnabled() {
     try {
-      return (BooleanContainer)(Object)DEFAULT_VALUE_GETTER.invokeExact();
+      return ((StaticStatistics)(Object)DEFAULT_VALUE_GETTER.invokeExact()).isEnabledNow();
     } catch (Throwable e) {
       throw new AssertionError(e.getMessage(), e);
     }
   }
   
   public static void enable() {
-    DEFAULT_VALUE.setValue(new TrueBooleanContainer());
+    DEFAULT_VALUE.setValue(new EnabledStatistics());
   }
 
   public static void disable() {
-    DEFAULT_VALUE.setValue(new FalseBooleanContainer());
+    DEFAULT_VALUE.setValue(new DisabledStatistics());
   }
 }
