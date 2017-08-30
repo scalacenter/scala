@@ -13,7 +13,7 @@ import java.nio.charset.{Charset, CharsetDecoder, IllegalCharsetNameException, U
 import scala.collection.{immutable, mutable}
 import io.{AbstractFile, Path, SourceReader}
 import reporters.Reporter
-import util.{ClassPath, StatisticsInfo, returning}
+import util.{ClassPath, returning}
 import scala.reflect.ClassTag
 import scala.reflect.internal.util.{BatchSourceFile, NoSourceFile, ScalaClassLoader, ScriptSourceFile, SourceFile}
 import scala.reflect.internal.pickling.PickleBuffer
@@ -26,7 +26,7 @@ import typechecker._
 import transform.patmat.PatternMatching
 import transform._
 import backend.{JavaPlatform, ScalaPrimitives}
-import backend.jvm.GenBCode
+import backend.jvm.{GenBCode, BackendStats}
 import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.tools.nsc.ast.{TreeGen => AstTreeGen}
@@ -158,10 +158,18 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   // Components for collecting and generating output
 
-  /** Some statistics (normally disabled) set with -Ystatistics */
-  object statistics extends {
-    val global: Global.this.type = Global.this
-  } with StatisticsInfo
+  import scala.reflect.internal.util.StatisticsInfo
+  trait AllStats extends ReflectStats
+                    with TypersStats
+                    with ImplicitsStats
+                    with MacrosStats
+                    with BackendStats
+
+  override object statistics extends {
+    override type Global = Global.this.type
+    override val symbolTable: SymbolTable = Global.this
+    override var nodeCount: Int = Global.this.nodeCount
+  } with StatisticsInfo with AllStats
 
   /** Print tree in detailed form */
   object nodePrinters extends {
@@ -1213,6 +1221,11 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       checkPhaseSettings(including = true, inclusions.toSeq: _*)
       checkPhaseSettings(including = false, exclusions map (_.value): _*)
 
+      // Report the overhead of statistics measurements per every run
+      import scala.reflect.internal.util.Statistics
+      if (Statistics.canEnable)
+        Statistics.reportStatisticsOverhead(reporter)
+
       phase = first   //parserPhase
       first
     }
@@ -1459,8 +1472,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
           runCheckers()
 
         // output collected statistics
-        if (settings.YstatisticsEnabled)
-          statistics.print(phase)
+        if (settings.YstatisticsEnabled && settings.Ystatistics.contains(phase.name))
+          statistics.print(phase, currentRun.units)
 
         advancePhase()
       }

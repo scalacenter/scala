@@ -44,8 +44,8 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
 
   import global._
   import definitions._
+  import statistics._
   import treeInfo.{isRepeatedParamType => _, _}
-  import MacrosStats._
 
   lazy val fastTrack = new FastTrack[self.type](self)
 
@@ -911,8 +911,8 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
     }.transform(expandee)
 }
 
-object MacrosStats {
-  import scala.reflect.internal.TypesStats.typerNanos
+trait MacrosStats {
+  self: scala.reflect.internal.TypesStats =>
   val macroExpandCount    = Statistics.newCounter ("#macro expansions", "typer")
   val macroExpandNanos    = Statistics.newSubTimer("time spent in macroExpand", typerNanos)
 }

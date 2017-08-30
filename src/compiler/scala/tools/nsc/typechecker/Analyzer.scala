@@ -76,7 +76,7 @@ trait Analyzer extends AnyRef
   object typerFactory extends {
     val global: Analyzer.this.global.type = Analyzer.this.global
   } with SubComponent {
-    import scala.reflect.internal.TypesStats.typerNanos
+    import global.statistics.typerNanos
     val phaseName = "typer"
     val runsAfter = List[String]()
     val runsRightAfter = Some("packageobjects")

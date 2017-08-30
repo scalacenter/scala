@@ -38,7 +38,7 @@ trait Trees extends api.Trees {
     val id = nodeCount // TODO: add to attachment?
     nodeCount += 1
 
-    if (Statistics.canEnable) Statistics.incCounter(TreesStats.nodeByType, getClass)
+    if (Statistics.hotEnabled) Statistics.incCounter(statistics.nodeByType, getClass)
 
     final override def pos: Position = rawatt.pos
 
@@ -1910,11 +1910,11 @@ trait Trees extends api.Trees {
   implicit val UnApplyTag             = ClassTag[UnApply](classOf[UnApply])
   implicit val ValDefTag              = ClassTag[ValDef](classOf[ValDef])
   implicit val ValOrDefDefTag         = ClassTag[ValOrDefDef](classOf[ValOrDefDef])
-
-  val treeNodeCount = Statistics.newView("#created tree nodes")(nodeCount)
 }
 
-object TreesStats {
-  // statistics
+trait TreesStats {
+  // Nodecount is only accessible from within `Trees.scala`, so this is mixed in at `SymbolTable`
+  var nodeCount: Int
+  val treeNodeCount = Statistics.newView("#created tree nodes")(nodeCount)
   val nodeByType = Statistics.newByClass("#created tree nodes by type")(Statistics.newCounter(""))
 }

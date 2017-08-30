@@ -86,7 +86,7 @@ trait Types
   with util.Collections { self: SymbolTable =>
 
   import definitions._
-  import TypesStats._
+  import statistics._
 
   private var explainSwitch = false
   private final val emptySymbolSet = immutable.Set.empty[Symbol]
@@ -4824,8 +4824,8 @@ object TypeConstants {
   final val LogVolatileThreshold         = DefaultLogThreshhold
 }
 
-object TypesStats {
-  import BaseTypeSeqsStats._
+trait TypesStats {
+  self: BaseTypeSeqsStats =>
   val rawTypeCount        = Statistics.newCounter   ("#raw type creations")
   val subtypeCount        = Statistics.newCounter   ("#subtype ops")
   val sametypeCount       = Statistics.newCounter   ("#sametype ops")
@@ -4847,12 +4847,4 @@ object TypesStats {
   val typerefBaseTypeSeqCount = Statistics.newSubCounter("  of which for typerefs", baseTypeSeqCount)
   val singletonBaseTypeSeqCount = Statistics.newSubCounter("  of which for singletons", baseTypeSeqCount)
   val typeOpsStack = Statistics.newTimerStack()
-
-  /* Commented out, because right now this does not inline, so creates a closure which will distort statistics
-  @inline final def timedTypeOp[T](c: Statistics.StackableTimer)(op: => T): T = {
-    val start = Statistics.pushTimer(typeOpsStack, c)
-    try op
-    finally
-  }
-  */
 }
