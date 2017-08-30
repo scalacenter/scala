@@ -30,7 +30,7 @@ trait Implicits {
 
   import global._
   import definitions._
-  import ImplicitsStats._
+  import statistics._
   import typingStack.printTyping
   import typeDebug._
 
@@ -1554,9 +1554,8 @@ trait Implicits {
   }
 }
 
-object ImplicitsStats {
-
-  import scala.reflect.internal.TypesStats._
+trait ImplicitsStats {
+  self: scala.reflect.internal.TypesStats =>
 
   val rawTypeImpl         = Statistics.newSubCounter ("  of which in implicits", rawTypeCount)
   val subtypeImpl         = Statistics.newSubCounter("  of which in implicit", subtypeCount)
@@ -1564,7 +1563,7 @@ object ImplicitsStats {
   val subtypeAppInfos     = Statistics.newSubCounter("  of which in app impl", subtypeCount)
   val implicitSearchCount = Statistics.newCounter   ("#implicit searches", "typer")
   val plausiblyCompatibleImplicits
-                                  = Statistics.newSubCounter("  #plausibly compatible", implicitSearchCount)
+                          = Statistics.newSubCounter("  #plausibly compatible", implicitSearchCount)
   val matchingImplicits   = Statistics.newSubCounter("  #matching", implicitSearchCount)
   val typedImplicits      = Statistics.newSubCounter("  #typed", implicitSearchCount)
   val foundImplicits      = Statistics.newSubCounter("  #found", implicitSearchCount)

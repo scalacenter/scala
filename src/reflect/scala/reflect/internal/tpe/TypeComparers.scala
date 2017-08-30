@@ -9,8 +9,9 @@ import scala.annotation.tailrec
 
 trait TypeComparers {
   self: SymbolTable =>
+
   import definitions._
-  import TypesStats._
+  import statistics._
 
   private final val LogPendingSubTypesThreshold = TypeConstants.DefaultLogThreshhold
 

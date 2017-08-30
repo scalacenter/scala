@@ -7,10 +7,10 @@ package tpe
 
 import Flags._
 import util.Statistics
-import TypesStats._
 
 trait FindMembers {
   this: SymbolTable =>
+  import statistics._
 
   /** Implementation of `Type#{findMember, findMembers}` */
   private[internal] abstract class FindMemberBase[T](tpe: Type, name: Name, excludedFlags: Long, requiredFlags: Long) {

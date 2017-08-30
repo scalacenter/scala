@@ -3,21 +3,21 @@
  * @author  Martin Odersky
  */
 
-package scala.tools.nsc
-package util
+package scala.reflect.internal.util
 
-import scala.reflect.internal.util.Statistics
+import scala.reflect.internal.{Phase, SymbolTable}
 
 abstract class StatisticsInfo {
+  type Global <: SymbolTable
+  val symbolTable: SymbolTable
 
-  val global: Global
-  import global._
-  import scala.reflect.internal.TreesStats.nodeByType
+  import symbolTable._
+  import statistics.{treeNodeCount, nodeByType}
 
   val retainedCount  = Statistics.newCounter("#retained tree nodes")
   val retainedByType = Statistics.newByClass("#retained tree nodes by type")(Statistics.newCounter(""))
 
-  def print(phase: Phase) = if (settings.Ystatistics contains phase.name) {
+  def print(phase: Phase, units: Iterator[Global#CompilationUnit]) = {
     inform("*** Cumulative statistics at phase " + phase)
 
     if (settings.YhotStatistics.value) {
@@ -25,7 +25,7 @@ abstract class StatisticsInfo {
       retainedCount.value = 0
       for (c <- retainedByType.keys)
         retainedByType(c).value = 0
-      for (u <- currentRun.units; t <- u.body) {
+      for (u <- units; t <- u.body) {
         retainedCount.value += 1
         retainedByType(t.getClass).value += 1
       }

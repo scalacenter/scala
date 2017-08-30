@@ -32,7 +32,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 
   import global._
   import definitions._
-  import TypersStats._
+  import statistics._
 
   final def forArgMode(fun: Tree, mode: Mode) =
     if (treeInfo.isSelfOrSuperConstrCall(fun)) mode | SCCmode else mode
@@ -5807,8 +5807,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
   }
 }
 
-object TypersStats {
-  import scala.reflect.internal.TypesStats._
+trait TypersStats {
+  self: scala.reflect.internal.TypesStats =>
   val typedIdentCount     = Statistics.newCounter("#typechecked identifiers")
   val typedSelectCount    = Statistics.newCounter("#typechecked selections")
   val typedApplyCount     = Statistics.newCounter("#typechecked applications")

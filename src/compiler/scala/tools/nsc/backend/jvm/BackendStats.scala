@@ -9,7 +9,7 @@ package backend.jvm
 import scala.reflect.internal.util.Statistics
 
 // Enable with `-Ystatistics:jvm`
-object BackendStats {
+trait BackendStats {
   import Statistics.{newTimer, newSubTimer}
   val bcodeTimer = newTimer("time in backend", "jvm")
 

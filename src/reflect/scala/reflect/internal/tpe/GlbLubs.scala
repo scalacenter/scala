@@ -10,8 +10,9 @@ import Variance._
 
 private[internal] trait GlbLubs {
   self: SymbolTable =>
+
   import definitions._
-  import TypesStats._
+  import statistics._
 
   private final val printLubs = scala.sys.props contains "scalac.debug.lub"
   private final val strictInference = settings.strictInference

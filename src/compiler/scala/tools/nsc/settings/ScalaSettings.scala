@@ -384,7 +384,7 @@ trait ScalaSettings extends AbsScalaSettings
   }
 
   def YstatisticsEnabled = Ystatistics.value.nonEmpty
-  val YhotStatistics = BooleanSetting("-Yhot-statistics", "Print hot compiler statistics for all relevant phases")
+  override val YhotStatistics = BooleanSetting("-Yhot-statistics", "Print hot compiler statistics for all relevant phases")
     .withPostSetHook(_ => Statistics.hotEnabled = true)
 
   val YprofileEnabled = BooleanSetting("-Yprofile-enabled", "Enable profiling.")

@@ -47,6 +47,7 @@ import scala.tools.nsc.backend.jvm.opt.ByteCodeRepository
  */
 abstract class GenBCode extends BCodeSyncAndTry {
   import global._
+  import statistics._
 
   import bTypes._
   import coreBTypes._
@@ -245,7 +246,7 @@ abstract class GenBCode extends BCodeSyncAndTry {
       }
 
       def localOptimizations(classNode: ClassNode): Unit = {
-        BackendStats.timed(BackendStats.methodOptTimer)(localOpt.methodOptimizations(classNode))
+        timed(methodOptTimer)(localOpt.methodOptimizations(classNode))
       }
 
       def setInnerClasses(classNode: ClassNode): Unit = if (classNode != null) {
@@ -329,9 +330,9 @@ abstract class GenBCode extends BCodeSyncAndTry {
      *
      */
     override def run() {
-      val bcodeStart = Statistics.startTimer(BackendStats.bcodeTimer)
+      val bcodeStart = Statistics.startTimer(bcodeTimer)
 
-      val initStart = Statistics.startTimer(BackendStats.bcodeInitTimer)
+      val initStart = Statistics.startTimer(bcodeInitTimer)
       arrivalPos = 0 // just in case
       scalaPrimitives.init()
       bTypes.initializeCoreBTypes()
@@ -339,7 +340,7 @@ abstract class GenBCode extends BCodeSyncAndTry {
       bTypes.javaDefinedClasses ++= currentRun.symSource collect {
         case (sym, _) if sym.isJavaDefined => sym.javaBinaryNameString
       }
-      Statistics.stopTimer(BackendStats.bcodeInitTimer, initStart)
+      Statistics.stopTimer(bcodeInitTimer, initStart)
 
       // initBytecodeWriter invokes fullName, thus we have to run it before the typer-dependent thread is activated.
       bytecodeWriter  = initBytecodeWriter(cleanup.getEntryPoints)
@@ -351,7 +352,7 @@ abstract class GenBCode extends BCodeSyncAndTry {
 
       // closing output files.
       bytecodeWriter.close()
-      Statistics.stopTimer(BackendStats.bcodeTimer, bcodeStart)
+      Statistics.stopTimer(bcodeTimer, bcodeStart)
 
       /* TODO Bytecode can be verified (now that all classfiles have been written to disk)
        *
@@ -377,15 +378,15 @@ abstract class GenBCode extends BCodeSyncAndTry {
     private def buildAndSendToDisk(needsOutFolder: Boolean) {
 
       feedPipeline1()
-      val genStart = Statistics.startTimer(BackendStats.bcodeGenStat)
+      val genStart = Statistics.startTimer(bcodeGenStat)
       (new Worker1(needsOutFolder)).run()
-      Statistics.stopTimer(BackendStats.bcodeGenStat, genStart)
+      Statistics.stopTimer(bcodeGenStat, genStart)
 
       (new Worker2).run()
 
-      val writeStart = Statistics.startTimer(BackendStats.bcodeWriteTimer)
+      val writeStart = Statistics.startTimer(bcodeWriteTimer)
       drainQ3()
-      Statistics.stopTimer(BackendStats.bcodeWriteTimer, writeStart)
+      Statistics.stopTimer(bcodeWriteTimer, writeStart)
 
     }
 
