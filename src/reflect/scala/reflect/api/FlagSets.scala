@@ -251,6 +251,9 @@ trait FlagSets { self: Universe =>
      *  (e.g. synthetic getters of valdefs).
      */
     val STABLE: FlagSet
+
+    /** Flag to distinguish opaque type aliases from regular type aliases. */
+    val OPAQUE: FlagSet
   }
 
   /** The empty set of flags

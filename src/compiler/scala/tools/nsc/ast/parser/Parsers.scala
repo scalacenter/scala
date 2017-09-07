@@ -639,7 +639,7 @@ self =>
 
     def isModifier: Boolean = in.token match {
       case ABSTRACT | FINAL | SEALED | PRIVATE |
-           PROTECTED | OVERRIDE | IMPLICIT | LAZY => true
+           PROTECTED | OVERRIDE | IMPLICIT | LAZY | OPAQUE => true
       case _ => false
     }
 
@@ -2164,7 +2164,8 @@ self =>
       OVERRIDE  -> Flags.OVERRIDE,
       PRIVATE   -> Flags.PRIVATE,
       PROTECTED -> Flags.PROTECTED,
-      SEALED    -> Flags.SEALED
+      SEALED    -> Flags.SEALED,
+      OPAQUE    -> Flags.OPAQUE
     )
 
     /** {{{
@@ -2189,7 +2190,7 @@ self =>
       def loop(mods: Modifiers): Modifiers = in.token match {
         case PRIVATE | PROTECTED =>
           loop(accessQualifierOpt(addMod(mods, flagTokens(in.token), tokenRange(in))))
-        case ABSTRACT | FINAL | SEALED | OVERRIDE | IMPLICIT | LAZY =>
+        case ABSTRACT | FINAL | SEALED | OVERRIDE | IMPLICIT | LAZY | OPAQUE =>
           loop(addMod(mods, flagTokens(in.token), tokenRange(in)))
         case NEWLINE =>
           in.nextToken()

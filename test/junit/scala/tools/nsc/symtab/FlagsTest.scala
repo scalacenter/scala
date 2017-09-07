@@ -123,4 +123,23 @@ class FlagsTest extends BytecodeTesting {
     assert( getRequiredClass("p.I1").isInterface)
     assert( getRequiredClass("p.I2").isInterface)
   }
+
+  @Test
+  def opaqueFlag(): Unit = {
+    val scalaCode =
+      """
+        |package object opaqueflag {
+        |  type A
+        |  type B = Int
+        |  opaque type C = String
+        |}
+      """.stripMargin
+    compiler.compileClasses(code = scalaCode)
+    import compiler.global.rootMirror._
+    val opaqueModule = getRequiredModule("opaqueflag")
+    val moduleMembers = opaqueModule.info.members
+    assert(!moduleMembers.lookup(compiler.global.TypeName("A")).isOpaque)
+    assert(!moduleMembers.lookup(compiler.global.TypeName("B")).isOpaque)
+    assert( moduleMembers.lookup(compiler.global.TypeName("C")).isOpaque)
+  }
 }

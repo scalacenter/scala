@@ -24,6 +24,7 @@ object Tokens extends CommonTokens {
   final val SEALED = 45
   final val LAZY = 55
   final val MACRO = 57
+  final val OPAQUE = 58
 
   /** templates */
   final val CASECLASS = 63

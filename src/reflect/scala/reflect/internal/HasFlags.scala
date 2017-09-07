@@ -121,6 +121,7 @@ trait HasFlags {
   def isSynthetic           = hasFlag(SYNTHETIC)
   def isTrait               = hasFlag(TRAIT) && !hasFlag(PARAM)
   def isTraitOrInterface    = isTrait || isInterface
+  def isOpaque              = hasFlag(OPAQUE)
 
   def flagBitsToString(bits: Long): String = {
     // Fast path for common case

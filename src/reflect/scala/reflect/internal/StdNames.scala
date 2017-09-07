@@ -209,6 +209,7 @@ trait StdNames {
     final val WITHkw: TermName      = kw("with")
     final val WHILEkw: TermName     = kw("while")
     final val YIELDkw: TermName     = kw("yield")
+    final val OPAQUEkw: TermName    = kw("opaque")
     final val DOTkw: TermName       = kw(".")
     final val USCOREkw: TermName    = kw("_")
     final val COLONkw: TermName     = kw(":")

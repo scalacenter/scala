@@ -73,7 +73,7 @@ package internal
 // 57:          notOVERRIDE
 // 58:           notPRIVATE
 // 59:
-// 60:
+// 60:               OPAQUE
 // 61:
 // 62:
 // 63:
@@ -122,6 +122,8 @@ class ModifierFlags {
   final val JAVA_DEFAULTMETHOD = 1L << 47     // symbol is a java default method
   final val JAVA_ENUM          = 1L << 48     // symbol is a java enum
   final val JAVA_ANNOTATION    = 1L << 49     // symbol is a java annotation
+
+  final val OPAQUE        = 1L << 60      // type alias is opaque
 
   // Overridden.
   def flagToString(flag: Long): String = ""
@@ -195,7 +197,7 @@ class Flags extends ModifierFlags {
   // The flags (1L << 59) to (1L << 63) are currently unused. If added to the InitialFlags mask,
   // they could be used as normal flags.
 
-  final val InitialFlags  = 0x0007FFFFFFFFFFFFL // normal flags, enabled from the first phase: 1L to (1L << 50)
+  final val InitialFlags  = 0x1007FFFFFFFFFFFFL // normal flags, enabled from the first phase: 1L to (1L << 50) + OPAQUE (1L << 60)
   final val LateFlags     = 0x00F8000000000000L // flags that override flags in (1L << 4) to (1L << 8): DEFERRED, FINAL, INTERFACE, METHOD, MODULE
   final val AntiFlags     = 0x0700000000000000L // flags that cancel flags in 1L to (1L << 2): PROTECTED, OVERRIDE, PRIVATE
   final val LateShift     = 47
@@ -250,7 +252,7 @@ class Flags extends ModifierFlags {
    *  when printing a normal message.)
    */
   final val ExplicitFlags =
-    PRIVATE | PROTECTED | ABSTRACT | FINAL | SEALED |
+    PRIVATE | PROTECTED | ABSTRACT | FINAL | SEALED | OPAQUE |
     OVERRIDE | CASE | IMPLICIT | ABSOVERRIDE | LAZY | JAVA_DEFAULTMETHOD
 
   /** The two bridge flags */
@@ -349,6 +351,7 @@ class Flags extends ModifierFlags {
   private final val METHOD_PKL     = (1 << 9)
   private final val MODULE_PKL     = (1 << 10)
   private final val INTERFACE_PKL  = (1 << 11)
+  private final val OPAQUE_PKL     = (1 << 12)
 
   private final val PKL_MASK       = 0x00000FFF
 
@@ -365,7 +368,8 @@ class Flags extends ModifierFlags {
     (INTERFACE, INTERFACE_PKL),
     (IMPLICIT, IMPLICIT_PKL),
     (SEALED, SEALED_PKL),
-    (ABSTRACT, ABSTRACT_PKL)
+    (ABSTRACT, ABSTRACT_PKL),
+    (OPAQUE, OPAQUE_PKL)
   )
 
   private val mappedRawFlags = rawPickledCorrespondence map (_._1)
@@ -456,7 +460,7 @@ class Flags extends ModifierFlags {
     case  0x200000000000000L => "<notoverride>"                       // (1L << 57)
     case        `notPRIVATE` => "<notprivate>"                        // (1L << 58)
     case NEEDS_TREES         => "<needs_trees>"                       // (1L << 59)
-    case 0x1000000000000000L => ""                                    // (1L << 60)
+    case              OPAQUE => "<opaque>"                            // (1L << 60)
     case 0x2000000000000000L => ""                                    // (1L << 61)
     case 0x4000000000000000L => ""                                    // (1L << 62)
     case 0x8000000000000000L => ""                                    // (1L << 63)

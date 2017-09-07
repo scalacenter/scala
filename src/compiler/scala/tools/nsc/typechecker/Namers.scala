@@ -1841,6 +1841,7 @@ trait Namers extends MethodSynthesis {
     /** Check that symbol's definition is well-formed. This means:
      *   - no conflicting modifiers
      *   - `abstract` modifier only for classes
+     *   - `opaque` modifiers only for type aliases
      *   - `override` modifier never for classes
      *   - `def` modifier never for parameters of case classes
      *   - declarations only in mixins or abstract classes (when not @native)
@@ -1870,6 +1871,13 @@ trait Namers extends MethodSynthesis {
           fail(SealedNonClass)
         if (sym.hasFlag(ABSTRACT))
           fail(AbstractNonClass)
+      }
+
+      if (sym.isOpaque) {
+        if (sym.isType && sym.isAbstract)
+          fail(OpaqueDeferredType)
+        if (!sym.isAliasType)
+          fail(OpaqueNonType)
       }
 
       if (sym.isConstructor && sym.isAnyOverride)

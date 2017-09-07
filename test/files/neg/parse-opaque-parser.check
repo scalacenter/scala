@@ -1,0 +1,4 @@
+parse-opaque-parser.scala:2: error: ';' expected but 'opaque' found.
+  class A opaque ()
+          ^
+one error found

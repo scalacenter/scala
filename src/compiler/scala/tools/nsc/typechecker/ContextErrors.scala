@@ -1102,7 +1102,7 @@ trait ContextErrors {
         val ImplicitConstr, ImplicitNotTermOrClass, ImplicitAtToplevel,
           OverrideClass, SealedNonClass, AbstractNonClass,
           OverrideConstr, AbstractOverride, AbstractOverrideOnTypeMember, LazyAndEarlyInit,
-          ByNameParameter, AbstractVar = Value
+          ByNameParameter, AbstractVar, OpaqueNonType, OpaqueDeferredType = Value
       }
 
       object DuplicatesErrorKinds extends Enumeration {
@@ -1191,6 +1191,12 @@ trait ContextErrors {
 
           case SealedNonClass =>
             "`sealed' modifier can be used only for classes"
+
+          case OpaqueNonType =>
+            "`opaque' modifier can be used only for type aliases"
+
+          case OpaqueDeferredType =>
+            "`opaque' modifier cannot be used for abstract type aliases"
 
           case AbstractNonClass =>
             "`abstract' modifier can be used only for classes; it should be omitted for abstract members"

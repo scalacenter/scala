@@ -1,0 +1,10 @@
+parse-opaque-checks.scala:2: error: `opaque' modifier can be used only for type aliases
+  opaque class A
+               ^
+parse-opaque-checks.scala:3: error: `opaque' modifier can be used only for type aliases
+  opaque object B
+                ^
+parse-opaque-checks.scala:5: error: `opaque' modifier cannot be used for abstract type aliases
+    opaque type C
+                ^
+three errors found
