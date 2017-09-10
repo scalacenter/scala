@@ -291,6 +291,7 @@ trait Symbols { self: Universe =>
 
     /** For a class: the module or case class factory with the same name in the same package.
      *  For a module: the class with the same name in the same package.
+     *  For an opaque type: the module with the same name in the same package.
      *  For all others: NoSymbol.
      *
      *  This API may return unexpected results for module classes, packages and package classes.
@@ -303,6 +304,7 @@ trait Symbols { self: Universe =>
 
     /** For a class: its companion object if exists.
      *  For a module or a module class: companion class of the module if exists.
+     *  For an opaque type: its companion object if exists.
      *  For a package or a package class: NoSymbol.
      *  For all others: NoSymbol.
      */

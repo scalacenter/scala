@@ -5555,6 +5555,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     }
 
     def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
+      //inform(s"TYPED ${showRaw(tree)}")
       lastTreeToTyper = tree
       def body = (
         if (printTypings && !phase.erasedTypes && !noPrintTyping(tree))

@@ -460,7 +460,7 @@ class Flags extends ModifierFlags {
     case  0x200000000000000L => "<notoverride>"                       // (1L << 57)
     case        `notPRIVATE` => "<notprivate>"                        // (1L << 58)
     case NEEDS_TREES         => "<needs_trees>"                       // (1L << 59)
-    case              OPAQUE => "<opaque>"                            // (1L << 60)
+    case              OPAQUE => "opaque"                              // (1L << 60)
     case 0x2000000000000000L => ""                                    // (1L << 61)
     case 0x4000000000000000L => ""                                    // (1L << 62)
     case 0x8000000000000000L => ""                                    // (1L << 63)

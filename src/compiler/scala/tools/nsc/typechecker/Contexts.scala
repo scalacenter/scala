@@ -1222,12 +1222,15 @@ trait Contexts { self: Analyzer =>
 
       // 1) Must be owned by the same Scope, to ensure that in
       //   `{ class C; { ...; object C } }`, the class is not seen as a companion of the object.
-      // 2) Must be a class and module symbol, so that `{ class C; def C }` or `{ type T; object T }` are not companions.
+      // 2) Must be a class and module symbol or an opaque type alias and a module symbol, so
+      //    that `{ class C; def C }` or `{ type T; object T }` are not companions.
       lookupScopeEntry(original) match {
         case null => NoSymbol
         case entry =>
           def isCompanion(sym: Symbol): Boolean =
-            (original.isModule && sym.isClass || sym.isModule && original.isClass) && sym.isCoDefinedWith(original)
+            (original.isModule && (sym.isClass || (sym.isOpaque && sym.isType && sym.asType.isAliasType)) ||
+             sym.isModule && (original.isClass || (original.isOpaque && original.isType && original.asType.isAliasType))) &&
+            sym.isCoDefinedWith(original)
           entry.owner.lookupNameInSameScopeAs(original, original.name.companionName).filter(isCompanion)
       }
     }

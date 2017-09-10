@@ -188,6 +188,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (isModule && !hasPackageFlag) companionSymbol
       else if (isModuleClass && !isPackageClass) sourceModule.companionSymbol
       else if (isClass && !isModuleClass && !isPackageClass) companionSymbol
+      else if (isOpaque && isType && asType.isAliasType) companionSymbol
       else NoSymbol
     }
 
@@ -2265,6 +2266,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def companionClass: Symbol = flatOwnerInfo.decl(name.toTypeName).suchThat(d => d.isClass && d.isCoDefinedWith(this))
 
     /** For a class: the module or case class factory with the same name in the same package.
+     * For an opaque type alias: the module with the same name in the same package.
      *  For all others: NoSymbol
      *  Note: does not work for modules owned by methods, see Namers.companionModuleOf
      *
@@ -2273,6 +2275,7 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def companionModule: Symbol = NoSymbol
 
     /** For a module: its linked class
+     * For an opaque type alias: its linked module.
      *  For a plain class: its linked module or case factory.
      *  Note: does not work for modules owned by methods, see Namers.companionSymbolOf
      *
@@ -2999,6 +3002,9 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     override def isContravariant = variance.isContravariant
     override def isCovariant     = variance.isCovariant
     final override def isAliasType = true
+    final override def companionSymbol =
+      if (!isOpaque) NoSymbol
+      else flatOwnerInfo.decl(name.toTermName).suchThat(sym => sym.isModule && (sym isCoDefinedWith this))
     override def cloneSymbolImpl(owner: Symbol, newFlags: Long): TypeSymbol =
       owner.newNonClassSymbol(name, pos, newFlags)
   }

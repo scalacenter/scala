@@ -58,6 +58,7 @@ trait Namers extends MethodSynthesis {
     private lazy val innerNamer =
       if (isTemplateContext(context)) createInnerNamer() else this
 
+    // TODO: Probably need to modify this...
     def createNamer(tree: Tree): Namer = {
       val sym = tree match {
         case ModuleDef(_, _, _) => tree.symbol.moduleClass

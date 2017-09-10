@@ -1500,7 +1500,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         profiler.afterPhase(Global.InitPhase, snap)
         compileSources(sources)
       }
-      catch { case ex: IOException => globalError(ex.getMessage()) }
+      catch {
+        case ex: IOException => globalError(ex.getMessage())
+        case t: Throwable =>
+          globalError(s"Error captured by the compiler ${t.getClass}: ${t.getMessage()}")
+          globalError(s"${t.getStackTrace.mkString("\n")}")
+          throw t
+      }
     }
 
     /** Compile list of files given by their names */
@@ -1515,7 +1521,13 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         profiler.afterPhase(Global.InitPhase, snap)
         compileSources(sources)
       }
-      catch { case ex: IOException => globalError(ex.getMessage()) }
+      catch {
+        case ex: IOException => globalError(ex.getMessage())
+        case t: Throwable =>
+          globalError(s"Error captured by the compiler ${t.getClass}: ${t.getMessage()}")
+          globalError(s"${t.getStackTrace.mkString("\n")}")
+          throw t
+      }
     }
 
     /** If this compilation is scripted, convert the source to a script source. */
