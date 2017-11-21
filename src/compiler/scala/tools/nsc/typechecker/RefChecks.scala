@@ -7,12 +7,11 @@ package scala.tools.nsc
 package typechecker
 
 import scala.language.postfixOps
-
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.reflect.NameTransformer
 import scala.tools.nsc.settings.ScalaVersion
 import scala.tools.nsc.settings.NoScalaVersion
-
 import symtab.Flags._
 import transform.Transform
 
@@ -1005,7 +1004,20 @@ abstract class RefChecks extends Transform {
       def isCaseEquals = isMethodCaseEquals(receiver.info.member(nme.equals_))
       // Whether this == or != is one of those defined in Any/AnyRef or an overload from elsewhere.
       def isUsingDefaultScalaOp = sym == Object_== || sym == Object_!= || sym == Any_== || sym == Any_!=
-      def haveSubclassRelationship = (actual isSubClass receiver) || (receiver isSubClass actual)
+      def haveSubclassRelationship = {
+        // These methods are ad-hoc and only a prototype -- will be reused.
+        def getUnderlying(sym: Symbol): Symbol = {
+          println(s"Getting underlying for $sym")
+          sym.annotations.head.tpe.typeSymbol
+        }
+        def isOpaqueSymbol(sym: Symbol): Boolean =
+          sym.name.endsWith(NameTransformer.OPAQUE_PROXY_STRING)
+
+        // This is necessary to avoid unrelated equality check warnings
+        val actual1 = if (isOpaqueSymbol(actual)) getUnderlying(actual) else actual
+        val receiver1 = if (isOpaqueSymbol(receiver)) getUnderlying(receiver) else receiver
+        (actual1 isSubClass receiver1) || (receiver1 isSubClass actual1)
+      }
 
       // Whether the operands+operator represent a warnable combo (assuming anyrefs)
       // Looking for comparisons performed with ==/!= in combination with either an
