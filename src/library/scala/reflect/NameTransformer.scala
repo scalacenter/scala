@@ -23,6 +23,7 @@ object NameTransformer {
   final val MODULE_VAR_SUFFIX_STRING      = "$module"
   final val SETTER_SUFFIX_STRING          = "_$eq"
   final val TRAIT_SETTER_SEPARATOR_STRING = "$_setter_$"
+  final val OPAQUE_PROXY_STRING           = "$proxy"
 
   private val nops = 128
   private val ncodes = 26 * 26

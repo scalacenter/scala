@@ -10,6 +10,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import symtab.Flags._
 import scala.language.postfixOps
+import scala.reflect.NameTransformer
 import scala.reflect.internal.util.ListOfNil
 
 /** This trait declares methods to create symbols and to enter them into scopes.
@@ -1659,7 +1660,7 @@ trait Namers extends MethodSynthesis {
     //@M! an abstract type definition (abstract type member/type parameter)
     // may take type parameters, which are in scope in its bounds
     private def typeDefSig(tdef: TypeDef) = {
-      val TypeDef(_, _, tparams, rhs) = tdef
+      val TypeDef(mods, name, tparams, rhs) = tdef
       // log("typeDefSig(" + tpsym + ", " + tparams + ")")
       val tparamSyms = typer.reenterTypeParams(tparams) //@M make tparams available in scope (just for this abstypedef)
       val tp = typer.typedType(rhs).tpe match {
@@ -1667,8 +1668,19 @@ trait Namers extends MethodSynthesis {
           TypeBounds.empty
         case tp @ TypeBounds(lt, rt) if (tdef.symbol hasFlag JAVA) =>
           TypeBounds(lt, objToAny(rt))
-        case tp =>
-          tp
+        case tp if tdef.mods.isOpaque =>
+          // Create a proxy universal trait
+          val flags = mods.&~(OPAQUE).|(TRAIT)
+          val newName = name.append(NameTransformer.OPAQUE_PROXY_STRING)
+          val template = Template(List(Ident(definitions.AnyClass)), noSelfType, Nil)
+          val proxyClass = ClassDef(flags, newName, Nil, template)
+          enterClassDef(proxyClass)
+
+          val proxySymbol = proxyClass.symbol
+          val underlyingAnnotation = AnnotationInfo(tp, Nil, Nil)
+          proxySymbol.addAnnotation(underlyingAnnotation)
+          proxySymbol.tpe
+        case tp => tp
       }
       // see neg/bug1275, #3419
       // used to do a rudimentary kind check here to ensure overriding in refinements

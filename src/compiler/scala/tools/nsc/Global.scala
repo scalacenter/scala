@@ -513,6 +513,14 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val runsRightAfter = None
   } with Fields
 
+  // phaseName = "opaquetypes"
+  object opaqueTypes extends {
+    val global: Global.this.type = Global.this
+    override val runsBefore = List("erasure")
+    val runsAfter = List("tailcalls")
+    val runsRightAfter = Some("tailcalls")
+  } with OpaqueTypes
+
   // phaseName = "explicitouter"
   object explicitOuter extends {
     val global: Global.this.type = Global.this
@@ -524,7 +532,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   object specializeTypes extends {
     val global: Global.this.type = Global.this
     val runsAfter = List("")
-    val runsRightAfter = Some("tailcalls")
+    val runsRightAfter = Some("opaquetypes")
   } with SpecializeTypes
 
   // phaseName = "erasure"
@@ -641,6 +649,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       uncurry                 -> "uncurry, translate function values to anonymous classes",
       fields                  -> "synthesize accessors and fields, add bitmaps for lazy vals",
       tailCalls               -> "replace tail calls by jumps",
+      opaqueTypes             -> "replace abstract opaque types by their dealiased underlying type",
       specializeTypes         -> "@specialized-driven class and method specialization",
       explicitOuter           -> "this refs to outer pointers",
       erasure                 -> "erase types, add interfaces for traits",
@@ -1522,7 +1531,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
         compileSources(sources)
       }
       catch {
-        case ex: IOException => globalError(ex.getMessage())
+        case ex: Throwable => globalError(ex.getMessage())
         case t: Throwable =>
           globalError(s"Error captured by the compiler ${t.getClass}: ${t.getMessage()}")
           globalError(s"${t.getStackTrace.mkString("\n")}")

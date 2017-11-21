@@ -1,18 +1,19 @@
 import scala.language.implicitConversions
 
 object opaquetypes {
-  class A { def foo: Int = 1 }
   // The opaque type definition
   opaque type Logarithm = Double
+
+  // Try to check that an opaque type can be used in a val definition
   val l: Logarithm = 1.toDouble.asInstanceOf[Logarithm]
-/*
-  implicit def double2Log(d: Double): Logarithm = d.asInstanceOf[Logarithm]
-  val l2: Logarithm = 1.toDouble*/
 
   // Logarithm$class, ideally all the methods would be static
   object Logarithm {
-/*    implicit def log2Double(l: Logarithm): Double = l.asInstanceOf[Double]
-    implicit def double2Log(d: Double): Logarithm = d.asInstanceOf[Logarithm]*/
+    // Should be implicitly added by namer in the future
+    implicit def log2Double(l: Logarithm): Double = l.asInstanceOf[Double]
+    implicit def double2Log(d: Double): Logarithm = d.asInstanceOf[Logarithm]
+
+    val l2: Logarithm = 1.toDouble
 
     // This is the way to lift to the logarithm opaque type
 /*    def apply(d: Double): Logarithm = d
@@ -31,17 +32,14 @@ object opaquetypes {
 
 object Test {
   def main(args: Array[String]): Unit = {
+    // This is to force init of logarithm
+    val _ = opaquetypes.l
+    /*  import Logarithm._
+      val fakeLogarithm: Logarithm = 1.0 // this fails
+      val legitLogarithm = Logarithm(1.0) // this works
+      val fakeDouble: Double = legitLogarithm // this fails
+      val legitDouble: Double = legitLogarithm.toDouble // this works
+      legitLogarithm.plus(Logarithm(2.0)) // this works
+      legitLogarithm.times(Logarithm(3.0)) // this works*/
   }
-}
-
-object UseSite {
-  import opaquetypes._
-  // Should be removed
-/*  import Logarithm._
-  val fakeLogarithm: Logarithm = 1.0 // this fails
-  val legitLogarithm = Logarithm(1.0) // this works
-  val fakeDouble: Double = legitLogarithm // this fails
-  val legitDouble: Double = legitLogarithm.toDouble // this works
-  legitLogarithm.plus(Logarithm(2.0)) // this works
-  legitLogarithm.times(Logarithm(3.0)) // this works*/
 }
