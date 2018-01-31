@@ -1,0 +1,25 @@
+# opt-in to Travis's newer/faster container-based infrastructure
+sudo: false
+
+# this builds the spec using jekyll
+# based on http://www.paperplanes.de/2013/8/13/deploying-your-jekyll-blog-to-s3-with-travis-ci.html
+language: ruby
+rvm:
+  - 2.2
+script: bundle exec jekyll build -s spec/ -d build/spec
+install: bundle install
+
+# cat /dev/urandom | head -c 10000 | openssl sha1 > ./secret
+# openssl aes-256-cbc -pass "file:./secret" -in id_dsa_spec212_b4096 -out spec/id_dsa_travis.enc -a
+# travis encrypt "PRIV_KEY_SECRET=`cat ./secret`"
+env:
+  - secure: "TuJOUtALynPd+MV1AuMeIpVb8BUBHr7Ul7FS48XhS2PyuTRpEBkSWybYcNg3AXyzmWDAuOjUxbaNMQBvP8vvehTbIYls5H5wTGKvj0D0TNVaPIXjF8bA8KyNat9xGNzhnWm2/2BMaWpKBJWRF7Jb+zHhijMYCJEbkMtoiE5R/mY="
+
+# ^^^ set PRIV_KEY_SECRET to password used to encrypt spec/id_dsa_travis.enc
+
+# the key is restricted using forced commands so that it can only upload to the directory we need here
+after_success:
+  - ./scripts/travis-publish-spec.sh
+
+# using S3 would be simpler, but we want to upload to scala-lang.org
+# after_success: bundle exec s3_website push --headless
