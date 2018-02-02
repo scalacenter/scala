@@ -662,6 +662,7 @@ lazy val test = project
   .settings(disablePublishing)
   .settings(Defaults.itSettings)
   .settings(
+    sourceDirectories in Compile := Seq(sourceDirectory.value),
     libraryDependencies ++= Seq(asmDep, partestDep, scalaXmlDep),
     libraryDependencies ++= {
       // Resolve the JARs for all test/files/lib/*.jar.desired.sha1 files through Ivy
