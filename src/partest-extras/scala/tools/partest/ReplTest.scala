@@ -6,7 +6,7 @@
 package scala.tools.partest
 
 import scala.tools.nsc.Settings
-import scala.tools.nsc.interpreter.{ ILoop, replProps }
+// import scala.tools.nsc.interpreter.{ ILoop, replProps }
 import scala.util.matching.Regex.Match
 
 /** A class for testing repl code.
@@ -26,11 +26,11 @@ abstract class ReplTest extends DirectTest {
   def inSession: Boolean = false
   /** True to preserve welcome header, eliding version number. */
   def welcoming: Boolean = false
-  lazy val header = replProps.welcome
+  lazy val header = "" //replProps.welcome
   def eval() = {
     val s = settings
     log("eval(): settings = " + s)
-    val transcript = ILoop.runForTranscript(code, s, inSession = inSession)
+    val transcript = "" // ILoop.runForTranscript(code, s, inSession = inSession)
     log(s"transcript[[$transcript]]")
     val lines = transcript.lines
     val clean =

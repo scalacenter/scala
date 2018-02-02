@@ -402,10 +402,10 @@ lazy val compiler = configureAsSubproject(project)
       (products in Compile in packageBin).value ++
         Seq((dependencyClasspath in Compile).value.find(_.get(moduleID.key) == Some(asmDep)).get.data) ++
         (products in Compile in packageBin in LocalProject("interactive")).value ++
-        (products in Compile in packageBin in LocalProject("scaladoc")).value ++
-        (products in Compile in packageBin in LocalProject("repl")).value ++
-        (products in Compile in packageBin in LocalProject("repl-jline")).value ++
-        (products in Compile in packageBin in LocalProject("repl-jline-embedded")).value,
+        (products in Compile in packageBin in LocalProject("scaladoc")).value,
+        /* (products in Compile in packageBin in LocalProject("repl")).value ++ */
+        /* (products in Compile in packageBin in LocalProject("repl-jline")).value ++ */
+        /* (products in Compile in packageBin in LocalProject("repl-jline-embedded")).value, */
     includeFilter in unmanagedResources in Compile :=
       "*.tmpl" | "*.xml" | "*.js" | "*.css" | "*.html" | "*.properties" | "*.swf" |
       "*.png" | "*.gif" | "*.gif" | "*.txt",
@@ -413,16 +413,16 @@ lazy val compiler = configureAsSubproject(project)
     mappings in Compile in packageSrc ++= {
       val base = (unmanagedResourceDirectories in Compile).value ++
         (unmanagedResourceDirectories in Compile in LocalProject("interactive")).value ++
-        (unmanagedResourceDirectories in Compile in LocalProject("scaladoc")).value ++
-        (unmanagedResourceDirectories in Compile in LocalProject("repl")).value
+        (unmanagedResourceDirectories in Compile in LocalProject("scaladoc")).value
+        /* (unmanagedResourceDirectories in Compile in LocalProject("repl")).value */
       base ** ((includeFilter in unmanagedResources in Compile).value || "*.scala" || "*.psd" || "*.ai" || "*.java") pair relativeTo(base)
     },
     // Include the additional projects in the scaladoc JAR:
     sources in Compile in doc ++= {
       val base =
         (unmanagedSourceDirectories in Compile in LocalProject("interactive")).value ++
-        (unmanagedSourceDirectories in Compile in LocalProject("scaladoc")).value ++
-        (unmanagedSourceDirectories in Compile in LocalProject("repl")).value
+        (unmanagedSourceDirectories in Compile in LocalProject("scaladoc")).value
+        /* (unmanagedSourceDirectories in Compile in LocalProject("repl")).value */
       ((base ** ("*.scala" || "*.java"))
         --- (base ** "Scaladoc*ModelTest.scala") // exclude test classes that depend on partest
       ).get
@@ -461,61 +461,61 @@ lazy val interactive = configureAsSubproject(project)
   )
   .dependsOn(compiler)
 
-lazy val repl = configureAsSubproject(project)
-  .settings(disableDocs)
-  .settings(disablePublishing)
-  .settings(
-    connectInput in run := true,
-    run := (run in Compile).partialInput(" -usejavacp").evaluated // Automatically add this so that `repl/run` works without additional arguments.
-  )
-  .dependsOn(compiler, interactive)
-
-lazy val replJline = configureAsSubproject(Project("repl-jline", file(".") / "src" / "repl-jline"))
-  .settings(disableDocs)
-  .settings(disablePublishing)
-  .settings(
-    libraryDependencies += jlineDep,
-    name := "scala-repl-jline"
-  )
-  .dependsOn(repl)
-
-lazy val replJlineEmbedded = Project("repl-jline-embedded", file(".") / "target" / "repl-jline-embedded-src-dummy")
-  .settings(scalaSubprojectSettings)
-  .settings(disablePublishing)
-  .settings(
-    name := "scala-repl-jline-embedded",
-    // There is nothing to compile for this project. Instead we use the compile task to create
-    // shaded versions of repl-jline and jline.jar. dist/mkBin puts all of quick/repl,
-    // quick/repl-jline and quick/repl-jline-shaded on the classpath for quick/bin scripts.
-    // This is different from the Ant build where all parts are combined into quick/repl, but
-    // it is cleaner because it avoids circular dependencies.
-    compile in Compile := (compile in Compile).dependsOn(Def.task {
-      import java.util.jar._
-      import collection.JavaConverters._
-      val inputs: Iterator[JarJar.Entry] = {
-        val repljlineClasses = (products in Compile in replJline).value.flatMap(base => Path.allSubpaths(base).map(x => (base, x._1)))
-        val jlineJAR = findJar((dependencyClasspath in Compile).value, jlineDep).get.data
-        val jarFile = new JarFile(jlineJAR)
-        val jarEntries = jarFile.entries.asScala.filterNot(_.isDirectory).map(entry => JarJar.JarEntryInput(jarFile, entry))
-        def compiledClasses = repljlineClasses.iterator.map { case (base, file) => JarJar.FileInput(base, file) }
-        (jarEntries ++ compiledClasses).filter(x =>
-          x.name.endsWith(".class") || x.name.endsWith(".properties") || x.name.startsWith("META-INF/native") || x.name.startsWith("META-INF/maven")
-        )
-      }
-      import JarJar.JarJarConfig._
-      val config: Seq[JarJar.JarJarConfig] = Seq(
-        Rule("org.fusesource.**", "scala.tools.fusesource_embedded.@1"),
-        Rule("jline.**", "scala.tools.jline_embedded.@1"),
-        Rule("scala.tools.nsc.interpreter.jline.**", "scala.tools.nsc.interpreter.jline_embedded.@1"),
-        Keep("scala.tools.**")
-      )
-      val outdir = (classDirectory in Compile).value
-      JarJar(inputs, outdir, config)
-    }).value,
-    connectInput in run := true
-
-  )
-  .dependsOn(replJline)
+/* lazy val repl = configureAsSubproject(project) */
+/*   .settings(disableDocs) */
+/*   .settings(disablePublishing) */
+/*   .settings( */
+/*     connectInput in run := true, */
+/*     run := (run in Compile).partialInput(" -usejavacp").evaluated // Automatically add this so that `repl/run` works without additional arguments. */
+/*   ) */
+/*   .dependsOn(compiler, interactive) */
+/*  */
+/* lazy val replJline = configureAsSubproject(Project("repl-jline", file(".") / "src" / "repl-jline")) */
+/*   .settings(disableDocs) */
+/*   .settings(disablePublishing) */
+/*   .settings( */
+/*     libraryDependencies += jlineDep, */
+/*     name := "scala-repl-jline" */
+/*   ) */
+/*   .dependsOn(repl) */
+/*  */
+/* lazy val replJlineEmbedded = Project("repl-jline-embedded", file(".") / "target" / "repl-jline-embedded-src-dummy") */
+/*   .settings(scalaSubprojectSettings) */
+/*   .settings(disablePublishing) */
+/*   .settings( */
+/*     name := "scala-repl-jline-embedded", */
+/*     // There is nothing to compile for this project. Instead we use the compile task to create */
+/*     // shaded versions of repl-jline and jline.jar. dist/mkBin puts all of quick/repl, */
+/*     // quick/repl-jline and quick/repl-jline-shaded on the classpath for quick/bin scripts. */
+/*     // This is different from the Ant build where all parts are combined into quick/repl, but */
+/*     // it is cleaner because it avoids circular dependencies. */
+/*     compile in Compile := (compile in Compile).dependsOn(Def.task { */
+/*       import java.util.jar._ */
+/*       import collection.JavaConverters._ */
+/*       val inputs: Iterator[JarJar.Entry] = { */
+/*         val repljlineClasses = (products in Compile in replJline).value.flatMap(base => Path.allSubpaths(base).map(x => (base, x._1))) */
+/*         val jlineJAR = findJar((dependencyClasspath in Compile).value, jlineDep).get.data */
+/*         val jarFile = new JarFile(jlineJAR) */
+/*         val jarEntries = jarFile.entries.asScala.filterNot(_.isDirectory).map(entry => JarJar.JarEntryInput(jarFile, entry)) */
+/*         def compiledClasses = repljlineClasses.iterator.map { case (base, file) => JarJar.FileInput(base, file) } */
+/*         (jarEntries ++ compiledClasses).filter(x => */
+/*           x.name.endsWith(".class") || x.name.endsWith(".properties") || x.name.startsWith("META-INF/native") || x.name.startsWith("META-INF/maven") */
+/*         ) */
+/*       } */
+/*       import JarJar.JarJarConfig._ */
+/*       val config: Seq[JarJar.JarJarConfig] = Seq( */
+/*         Rule("org.fusesource.**", "scala.tools.fusesource_embedded.@1"), */
+/*         Rule("jline.**", "scala.tools.jline_embedded.@1"), */
+/*         Rule("scala.tools.nsc.interpreter.jline.**", "scala.tools.nsc.interpreter.jline_embedded.@1"), */
+/*         Keep("scala.tools.**") */
+/*       ) */
+/*       val outdir = (classDirectory in Compile).value */
+/*       JarJar(inputs, outdir, config) */
+/*     }).value, */
+/*     connectInput in run := true */
+/*  */
+/*   ) */
+/*   .dependsOn(replJline) */
 
 lazy val scaladoc = configureAsSubproject(project)
   .settings(disableDocs)
@@ -542,7 +542,7 @@ lazy val scalap = configureAsSubproject(project)
   .dependsOn(compiler)
 
 lazy val partestExtras = Project("partest-extras", file(".") / "src" / "partest-extras")
-  .dependsOn(replJlineEmbedded, scaladoc)
+  .dependsOn(/*replJlineEmbedded,*/ scaladoc)
   .settings(commonSettings)
   .settings(generatePropertiesFileSettings)
   .settings(clearSourceAndResourceDirectories)
@@ -655,7 +655,7 @@ lazy val partestJavaAgent = Project("partest-javaagent", file(".") / "src" / "pa
   )
 
 lazy val test = project
-  .dependsOn(compiler, interactive, replJlineEmbedded, scalap, partestExtras, partestJavaAgent, scaladoc)
+  .dependsOn(compiler, interactive, /*replJlineEmbedded,*/ scalap, partestExtras, partestJavaAgent, scaladoc)
   .configs(IntegrationTest)
   .settings(commonSettings)
   .settings(disableDocs)
@@ -889,7 +889,7 @@ lazy val root: Project = (project in file("."))
         .withRecompileOnMacroDef(false) //     // macros in library+reflect are hard-wired to implementations with `FastTrack`.
     }
   )
-  .aggregate(library, reflect, compiler, interactive, repl, replJline, replJlineEmbedded,
+  .aggregate(library, reflect, compiler, interactive, /*repl, replJline, replJlineEmbedded,*/
     scaladoc, scalap, partestExtras, junit, libraryAll, scalaDist).settings(
     sources in Compile := Seq.empty,
     onLoadMessage := """|*** Welcome to the sbt build definition for Scala! ***
@@ -897,7 +897,7 @@ lazy val root: Project = (project in file("."))
   )
 
 // The following subprojects' binaries are required for building "pack":
-lazy val distDependencies = Seq(replJline, replJlineEmbedded, compiler, library, reflect, scalap, scaladoc)
+lazy val distDependencies = Seq(/*replJline, replJlineEmbedded,*/ compiler, library, reflect, scalap, scaladoc)
 
 lazy val dist = (project in file("dist"))
   .settings(commonSettings)
@@ -1000,7 +1000,7 @@ lazy val mkBinImpl: Def.Initialize[Task[Seq[File]]] = Def.task {
 
   streams.value.log.info(s"Creating scripts in $quickOutDir and $packOutDir")
 
-  mkBin("scala"    , "scala.tools.nsc.MainGenericRunner", (fullClasspath in Compile in replJlineEmbedded).value) ++
+  /* mkBin("scala"    , "scala.tools.nsc.MainGenericRunner", (fullClasspath in Compile in replJlineEmbedded).value) ++ */
   mkBin("scalac"   , "scala.tools.nsc.Main",              (fullClasspath in Compile in compiler).value) ++
   mkBin("fsc"      , "scala.tools.nsc.CompileClient",     (fullClasspath in Compile in compiler).value) ++
   mkBin("scaladoc" , "scala.tools.nsc.ScalaDoc",          (fullClasspath in Compile in scaladoc).value) ++
@@ -1031,7 +1031,7 @@ watchSources ++= PartestUtil.testFilePaths((baseDirectory in ThisBuild).value, (
 commands ++= {
   val commands =
   List(("scalac",   "compiler", "scala.tools.nsc.Main"),
-       ("scala",    "repl-jline-embedded", "scala.tools.nsc.MainGenericRunner"),
+       /* ("scala",    "repl-jline-embedded", "scala.tools.nsc.MainGenericRunner"), */
        ("scaladoc", "scaladoc", "scala.tools.nsc.ScalaDoc"))
 
   commands.map {
@@ -1073,8 +1073,8 @@ intellij := {
       moduleDeps(partestExtras).value,
       moduleDeps(partestJavaAgent).value,
       moduleDeps(reflect).value,
-      moduleDeps(repl).value,
-      moduleDeps(replJline).value,
+      /* moduleDeps(repl).value, */
+      /* moduleDeps(replJline).value, */
       // moduleDeps(replJlineEmbedded).value,   // No sources
       // moduleDeps(root).value,                // No sources
       // moduleDeps(scalaDist).value,           // No sources
