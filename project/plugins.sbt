@@ -29,3 +29,5 @@ libraryDependencies ++= Seq(
 concurrentRestrictions in Global := Seq(
   Tags.limitAll(1) // workaround for https://github.com/sbt/sbt/issues/2970
 )
+
+addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.1")

@@ -319,11 +319,10 @@ def regexFileFilter(s: String): FileFilter = new FileFilter {
 }
 
 // This project provides the STARR scalaInstance for bootstrapping
-lazy val bootstrap = project in file("target/bootstrap")
+lazy val bootstrap = project.in(file("target/bootstrap")).disablePlugins(CoursierPlugin)
 
 lazy val library = configureAsSubproject(project)
   .settings(generatePropertiesFileSettings)
-  .settings(Osgi.settings)
   .settings(
     name := "scala-library",
     description := "Scala Standard Library",
@@ -343,8 +342,6 @@ lazy val library = configureAsSubproject(project)
       val base = (unmanagedResourceDirectories in Compile).value
       base ** "*.txt" pair relativeTo(base)
     },
-    Osgi.headers += "Import-Package" -> "sun.misc;resolution:=optional, *",
-    Osgi.jarlist := true,
     fixPom(
       "/project/name" -> <name>Scala Library</name>,
       "/project/description" -> <description>Standard library for the Scala Programming Language</description>,
@@ -361,18 +358,12 @@ lazy val library = configureAsSubproject(project)
 
 lazy val reflect = configureAsSubproject(project)
   .settings(generatePropertiesFileSettings)
-  .settings(Osgi.settings)
   .settings(
     name := "scala-reflect",
     description := "Scala Reflection Library",
-    Osgi.bundleName := "Scala Reflect",
     scalacOptions in Compile in doc ++= Seq(
       "-skip-packages", "scala.reflect.macros.internal:scala.reflect.internal:scala.reflect.io"
     ),
-    Osgi.headers +=
-      "Import-Package" -> ("scala.*;version=\"${range;[==,=+);${ver}}\","+
-                           "scala.tools.nsc;resolution:=optional;version=\"${range;[==,=+);${ver}}\","+
-                           "*"),
     fixPom(
       "/project/name" -> <name>Scala Compiler</name>,
       "/project/description" -> <description>Compiler for the Scala Programming Language</description>,
@@ -386,7 +377,6 @@ lazy val reflect = configureAsSubproject(project)
 lazy val compiler = configureAsSubproject(project)
   .settings(generatePropertiesFileSettings)
   .settings(generateBuildCharacterFileSettings)
-  .settings(Osgi.settings)
   .settings(
     name := "scala-compiler",
     description := "Scala Compiler",
@@ -430,14 +420,6 @@ lazy val compiler = configureAsSubproject(project)
     scalacOptions in Compile in doc ++= Seq(
       "-doc-root-content", (sourceDirectory in Compile).value + "/rootdoc.txt"
     ),
-    Osgi.headers ++= Seq(
-      "Import-Package" -> ("jline.*;resolution:=optional," +
-                           "org.apache.tools.ant.*;resolution:=optional," +
-                           "scala.xml.*;version=\"${range;[====,====];"+versionNumber("scala-xml")+"}\";resolution:=optional," +
-                           "scala.*;version=\"${range;[==,=+);${ver}}\"," +
-                           "*"),
-      "Class-Path" -> "scala-reflect.jar scala-library.jar"
-    ),
     // Generate the ScriptEngineFactory service definition. The Ant build does this when building
     // the JAR but sbt has no support for it and it is easier to do as a resource generator:
     generateServiceProviderResources("javax.script.ScriptEngineFactory" -> "scala.tools.nsc.interpreter.Scripted$Factory"),
@@ -480,6 +462,7 @@ lazy val replJline = configureAsSubproject(Project("repl-jline", file(".") / "sr
   .dependsOn(repl)
 
 lazy val replJlineEmbedded = Project("repl-jline-embedded", file(".") / "target" / "repl-jline-embedded-src-dummy")
+  .disablePlugins(CoursierPlugin)
   .settings(scalaSubprojectSettings)
   .settings(disablePublishing)
   .settings(
@@ -542,6 +525,7 @@ lazy val scalap = configureAsSubproject(project)
   .dependsOn(compiler)
 
 lazy val partestExtras = Project("partest-extras", file(".") / "src" / "partest-extras")
+  .disablePlugins(CoursierPlugin)
   .dependsOn(replJlineEmbedded, scaladoc)
   .settings(commonSettings)
   .settings(generatePropertiesFileSettings)
@@ -556,6 +540,7 @@ lazy val partestExtras = Project("partest-extras", file(".") / "src" / "partest-
   )
 
 lazy val junit = project.in(file("test") / "junit")
+  .disablePlugins(CoursierPlugin)
   .dependsOn(library, reflect, compiler, partestExtras, scaladoc)
   .settings(clearSourceAndResourceDirectories)
   .settings(commonSettings)
@@ -571,6 +556,7 @@ lazy val junit = project.in(file("test") / "junit")
   )
 
 lazy val scalacheck = project.in(file("test") / "scalacheck")
+  .disablePlugins(CoursierPlugin)
   .dependsOn(library, reflect, compiler, scaladoc)
   .settings(clearSourceAndResourceDirectories)
   .settings(commonSettings)
@@ -596,6 +582,7 @@ lazy val osgiTestEclipse = osgiTestProject(
   "org.eclipse.tycho" % "org.eclipse.osgi" % "3.10.100.v20150521-1310")
 
 def osgiTestProject(p: Project, framework: ModuleID) = p
+  .disablePlugins(CoursierPlugin)
   .dependsOn(library, reflect, compiler)
   .settings(clearSourceAndResourceDirectories)
   .settings(commonSettings)
@@ -637,6 +624,7 @@ def osgiTestProject(p: Project, framework: ModuleID) = p
   )
 
 lazy val partestJavaAgent = Project("partest-javaagent", file(".") / "src" / "partest-javaagent")
+  .disablePlugins(CoursierPlugin)
   .settings(commonSettings)
   .settings(generatePropertiesFileSettings)
   .settings(disableDocs)
@@ -655,6 +643,7 @@ lazy val partestJavaAgent = Project("partest-javaagent", file(".") / "src" / "pa
   )
 
 lazy val test = project
+  .disablePlugins(CoursierPlugin)
   .dependsOn(compiler, interactive, replJlineEmbedded, scalap, partestExtras, partestJavaAgent, scaladoc)
   .configs(IntegrationTest)
   .settings(commonSettings)
@@ -711,6 +700,7 @@ lazy val test = project
   )
 
 lazy val manual = configureAsSubproject(project)
+  .disablePlugins(CoursierPlugin)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(
@@ -720,6 +710,7 @@ lazy val manual = configureAsSubproject(project)
 
 lazy val libraryAll = Project("library-all", file(".") / "target" / "library-all-src-dummy")
   .settings(commonSettings)
+  .disablePlugins(CoursierPlugin)
   .settings(disableDocs)
   .settings(
     name := "scala-library-all",
@@ -735,6 +726,7 @@ lazy val libraryAll = Project("library-all", file(".") / "target" / "library-all
   .dependsOn(library, reflect)
 
 lazy val scalaDist = Project("scala-dist", file(".") / "target" / "scala-dist-dist-src-dummy")
+  .disablePlugins(CoursierPlugin)
   .settings(commonSettings)
   .settings(disableDocs)
   .settings(
@@ -781,6 +773,7 @@ lazy val scalaDist = Project("scala-dist", file(".") / "target" / "scala-dist-di
   .dependsOn(libraryAll, compiler, scalap)
 
 lazy val root: Project = (project in file("."))
+  .disablePlugins(CoursierPlugin)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(generateBuildCharacterFileSettings)
@@ -900,6 +893,7 @@ lazy val root: Project = (project in file("."))
 lazy val distDependencies = Seq(replJline, replJlineEmbedded, compiler, library, reflect, scalap, scaladoc)
 
 lazy val dist = (project in file("dist"))
+  .disablePlugins(CoursierPlugin)
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(scalaSwingDep, jlineDep),
@@ -950,6 +944,7 @@ lazy val dist = (project in file("dist"))
 def configureAsSubproject(project: Project): Project = {
   val base = file(".") / "src" / project.id
   (project in base)
+    .disablePlugins(CoursierPlugin)
     .settings(scalaSubprojectSettings)
     .settings(generatePropertiesFileSettings)
 }
