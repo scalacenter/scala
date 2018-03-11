@@ -318,8 +318,14 @@ def regexFileFilter(s: String): FileFilter = new FileFilter {
   def accept(f: File) = pat.matcher(f.getAbsolutePath.replace('\\', '/')).matches()
 }
 
+lazy val noBloop = Seq(
+  bloopGenerate in Compile := {()},
+  bloopGenerate in Test := {()}
+)
+
 // This project provides the STARR scalaInstance for bootstrapping
-lazy val bootstrap = project in file("target/bootstrap")
+lazy val bootstrap = project.in(file("target/bootstrap"))
+  .settings(noBloop)
 
 lazy val library = configureAsSubproject(project)
   .settings(generatePropertiesFileSettings)
@@ -453,6 +459,7 @@ lazy val compiler = configureAsSubproject(project)
   .dependsOn(library, reflect)
 
 lazy val interactive = configureAsSubproject(project)
+  .settings(noBloop)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(
@@ -462,6 +469,7 @@ lazy val interactive = configureAsSubproject(project)
   .dependsOn(compiler)
 
 lazy val repl = configureAsSubproject(project)
+  .settings(noBloop)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(
@@ -471,6 +479,7 @@ lazy val repl = configureAsSubproject(project)
   .dependsOn(compiler, interactive)
 
 lazy val replJline = configureAsSubproject(Project("repl-jline", file(".") / "repl-jline"))
+  .settings(noBloop)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(
@@ -480,6 +489,7 @@ lazy val replJline = configureAsSubproject(Project("repl-jline", file(".") / "re
   .dependsOn(repl)
 
 lazy val replJlineEmbedded = Project("repl-jline-embedded", file(".") / "target" / "repl-jline-embedded-src-dummy")
+  .settings(noBloop)
   .settings(scalaSubprojectSettings)
   .settings(disablePublishing)
   .settings(
@@ -518,6 +528,7 @@ lazy val replJlineEmbedded = Project("repl-jline-embedded", file(".") / "target"
   .dependsOn(replJline)
 
 lazy val scaladoc = configureAsSubproject(project)
+  .settings(noBloop)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(
@@ -529,6 +540,7 @@ lazy val scaladoc = configureAsSubproject(project)
   .dependsOn(compiler)
 
 lazy val scalap = configureAsSubproject(project)
+  .settings(noBloop)
   .settings(
     description := "Scala Bytecode Parser",
     // Include decoder.properties
@@ -542,6 +554,7 @@ lazy val scalap = configureAsSubproject(project)
   .dependsOn(compiler)
 
 lazy val partestExtras = Project("partest-extras", file(".") / "src" / "partest-extras")
+  .settings(noBloop)
   .dependsOn(replJlineEmbedded, scaladoc)
   .settings(commonSettings)
   .settings(generatePropertiesFileSettings)
@@ -556,6 +569,7 @@ lazy val partestExtras = Project("partest-extras", file(".") / "src" / "partest-
   )
 
 lazy val junit = project.in(file("scalaTest") / "junit")
+  .settings(noBloop)
   .dependsOn(library, reflect, compiler, partestExtras, scaladoc)
   .settings(clearSourceAndResourceDirectories)
   .settings(commonSettings)
@@ -571,6 +585,7 @@ lazy val junit = project.in(file("scalaTest") / "junit")
   )
 
 lazy val scalacheck = project.in(file("scalaTest") / "scalacheck")
+  .settings(noBloop)
   .dependsOn(library, reflect, compiler, scaladoc)
   .settings(clearSourceAndResourceDirectories)
   .settings(commonSettings)
@@ -597,6 +612,7 @@ lazy val osgiTestEclipse = osgiTestProject(
 
 def osgiTestProject(p: Project, framework: ModuleID) = p
   .dependsOn(library, reflect, compiler)
+  .settings(noBloop)
   .settings(clearSourceAndResourceDirectories)
   .settings(commonSettings)
   .settings(disableDocs)
@@ -637,6 +653,7 @@ def osgiTestProject(p: Project, framework: ModuleID) = p
   )
 
 lazy val partestJavaAgent = Project("partest-javaagent", file(".") / "src" / "partest-javaagent")
+  .settings(noBloop)
   .settings(commonSettings)
   .settings(generatePropertiesFileSettings)
   .settings(disableDocs)
@@ -656,6 +673,7 @@ lazy val partestJavaAgent = Project("partest-javaagent", file(".") / "src" / "pa
 
 lazy val scalaTest = project
   .dependsOn(compiler, interactive, replJlineEmbedded, scalap, partestExtras, partestJavaAgent, scaladoc)
+  .settings(noBloop)
   .configs(IntegrationTest)
   .settings(commonSettings)
   .settings(disableDocs)
@@ -715,6 +733,7 @@ lazy val scalaTest = project
   )
 
 lazy val manual = configureAsSubproject(project)
+  .settings(noBloop)
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(
@@ -723,6 +742,7 @@ lazy val manual = configureAsSubproject(project)
   )
 
 lazy val libraryAll = Project("library-all", file(".") / "target" / "library-all-src-dummy")
+  .settings(noBloop)
   .settings(commonSettings)
   .settings(disableDocs)
   .settings(
@@ -741,6 +761,7 @@ lazy val libraryAll = Project("library-all", file(".") / "target" / "library-all
 lazy val scalaDist = Project("scala-dist", file(".") / "target" / "scala-dist-dist-src-dummy")
   .settings(commonSettings)
   .settings(disableDocs)
+  .settings(noBloop)
   .settings(
     mappings in Compile in packageBin ++= {
       val binBaseDir = buildDirectory.value / "pack"
@@ -788,6 +809,7 @@ lazy val root: Project = (project in file("."))
   .settings(disableDocs)
   .settings(disablePublishing)
   .settings(generateBuildCharacterFileSettings)
+  .settings(noBloop)
   .settings(
     commands ++= ScriptCommands.all,
     extractBuildCharacterPropertiesFile := {
@@ -905,6 +927,7 @@ lazy val distDependencies = Seq(replJline, replJlineEmbedded, compiler, library,
 
 lazy val dist = (project in file("dist"))
   .settings(commonSettings)
+  .settings(noBloop)
   .settings(
     libraryDependencies ++= Seq(scalaSwingDep, jlineDep),
     mkBin := mkBinImpl.value,
