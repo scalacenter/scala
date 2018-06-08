@@ -319,8 +319,8 @@ def regexFileFilter(s: String): FileFilter = new FileFilter {
 }
 
 lazy val noBloop = Seq(
-  bloopGenerate in Compile := {new File("target/fake.json")},
-  bloopGenerate in Test := {new File("target/fake-test.json")}
+  bloopGenerate in Compile := None,
+  bloopGenerate in Test := None
 )
 
 // This project provides the STARR scalaInstance for bootstrapping
