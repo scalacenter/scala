@@ -14,7 +14,7 @@ import sbt.librarymanagement.{
  *  Dotty in .travis.yml.
  */
 object DottySupport {
-  val currentDottyRelease = "0.21.0-RC1" // TASTy version 18
+  val currentDottyRelease = "0.21.0" // TASTy version 18
   val dottyLibrary = "ch.epfl.lamp" % "dotty-library_0.21" % currentDottyRelease
   val dottyCompiler = "ch.epfl.lamp" % "dotty-compiler_0.21" % currentDottyRelease
   val dottyVersion = "0.21.0-RC1"
