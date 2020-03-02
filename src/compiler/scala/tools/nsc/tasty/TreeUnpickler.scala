@@ -112,10 +112,9 @@ class TreeUnpickler[Tasty <: TastyUniverse](
     self.withTastyFlagSet(tastyFlagSet)
 
     override def complete(sym: Symbol): Unit = {
-      cycleAtAddr(currentAddr) =
-        Contexts.withPhaseNoLater(ctx.picklerPhase) { implicit ctx => // TODO really this needs to construct a new Context from the current symbolTable that this is completed from
-          new TreeReader(reader).readIndexedMember()//(ctx.withOwner(owner).withSource(source))
-        }
+      cycleAtAddr(currentAddr) = withPhaseNoLater(ctx.picklerPhase) { // TODO really this needs to construct a new Context from the current symbolTable that this is completed from
+        new TreeReader(reader).readIndexedMember()//(ctx.withOwner(owner).withSource(source))
+      }
     }
   }
 
@@ -320,6 +319,19 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           result.asInstanceOf[Res]
         }
 
+        def readVariances(tp: Type): Type = tp match {
+          case tp: LambdaPolyType if currentAddr != end =>
+            val vs = until(end) {
+              readByte() match {
+                case STABLE => Variance.Invariant
+                case COVARIANT => Variance.Covariant
+                case CONTRAVARIANT => Variance.Contravariant
+              }
+            }
+            tp.withVariances(vs)
+          case _ => tp
+        }
+
         val result =
           (tag: @switch) match {
             // case TERMREFin =>
@@ -352,8 +364,9 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               boundedAppliedType(readType(), until(end)(readType()))
             case TYPEBOUNDS =>
               val lo = readType()
-              val hi = readType()
-              TypeBounds.bounded(lo, hi) // if (lo.isMatch && (lo `eq` hi)) MatchAlias(lo) else TypeBounds(lo, hi)
+              if (nothingButMods(end))
+                typeRef(readVariances(lo))
+              else TypeBounds.bounded(lo, readVariances(readType()))
             case ANNOTATEDtype =>
               mkAnnotatedType(readType(), mkAnnotation(readTerm()))
             case ANDtype =>
@@ -419,8 +432,6 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             }
           case RECthis =>
             sys.error("RECthis")//readTypeRef().asInstanceOf[RecType].recThis
-          case TYPEALIAS =>
-            readType()// TypeAlias(readType())
           case SHAREDtype =>
             val ref = readAddr()
             typeAtAddr.getOrElseUpdate(ref, forkAt(ref).readType())
@@ -440,7 +451,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
     private def readSymNameRef()(implicit ctx: Context): Type = {
       val sym    = readSymRef()
       val prefix = readType()
-      // TODO tasty: restore this if github:lampepfl/dotty/tests/pos/extmethods.scala causes infinite loop
+      // TODO [tasty]: restore this if github:lampepfl/dotty/tests/pos/extmethods.scala causes infinite loop
       // prefix match {
         // case prefix: ThisType if (prefix.sym `eq` sym.owner) && sym.isTypeParameter /*&& !sym.is(Opaque)*/ =>
         //   mkAppliedType(sym, Nil)
@@ -528,10 +539,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       readByte() // tag
       readEnd()  // end
       var name: Name = readEncodedName()
-      nextUnsharedTag match {
-        case TYPEBOUNDS | TYPEALIAS => name = name.toTypeName
-        case _ =>
-      }
+      if (nextUnsharedTag == TYPEBOUNDS) name = name.toTypeName
       val typeReader = fork
       val completer = new TastyLazyType {
         override def complete(sym: Symbol): Unit =
@@ -645,7 +653,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       sym
     }
 
-    private def allowsOverload(sym: Symbol) = ( // taken from Namer. TODO tasty: added module to allows overload
+    private def allowsOverload(sym: Symbol) = ( // taken from Namer. TODO [tasty]: added module to allows overload
       (sym.isSourceMethod || sym.isModule) && sym.owner.isClass && !sym.isTopLevel
     )
 
@@ -953,8 +961,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         else tpe
       }
       if (parentTypes.head.typeSymbolDirect === defn.AnyValClass) {
-        // TODO tasty: please reconsider if there is some shared optimised logic that can be triggered instead.
-        Contexts.withPhaseNoLater(ctx.extmethodsPhase) { implicit ctx =>
+        // TODO [tasty]: please reconsider if there is some shared optimised logic that can be triggered instead.
+        withPhaseNoLater(ctx.extmethodsPhase) {
           // duplicated from scala.tools.nsc.transform.ExtensionMethods
           cls.primaryConstructor.makeNotPrivate(noSymbol)
           for (decl <- cls.info.decls if decl.isMethod) {
@@ -1349,7 +1357,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               Typed(expr, tpt).setType(tpt.tpe)
             case ASSIGN =>
               Assign(readTerm(), readTerm()).setType(defn.UnitTpe)
-            case BLOCK => // TODO tasty: when we support annotation trees, we need to restore readIndexedMember to create trees, and then put the stats in the block.
+            case BLOCK => // TODO [tasty]: when we support annotation trees, we need to restore readIndexedMember to create trees, and then put the stats in the block.
               val exprReader = fork
               skipTree()
               until(end)(skipTree()) //val stats = readStats(ctx.owner, end)
@@ -1379,7 +1387,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
                 val elsep = readTerm()
                 If(cond, thenp, elsep).setType(lub(thenp.tpe, elsep.tpe))
               }
-            case LAMBDA => // TODO tasty: if we need trees then we need to either turn this closure to the result of Delambdafy, or resugar to a Function
+            case LAMBDA => // TODO [tasty]: if we need trees then we need to either turn this closure to the result of Delambdafy, or resugar to a Function
               val meth = readTerm()
               val tpt = ifBefore(end)(readTpt(), emptyTree)
               TypeTree(meth.tpe) //Closure(Nil, meth, tpt)
@@ -1437,12 +1445,14 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               val patType = readType()
               val argPats = until(end)(readTerm())
               UnApply(fn, implicitArgs, argPats, patType)
-//            case REFINEDtpt =>
-//              val refineCls = ctx.newRefinedClassSymbol(coordAt(start))
-//              typeAtAddr(start) = refineCls.typeRef
-//              val parent = readTpt()
-//              val refinements = readStats(refineCls, end)(localContext(refineCls))
-//              RefinedTypeTree(parent, refinements, refineCls)
+            // case REFINEDtpt =>
+            //   val refineCls = symAtAddr.getOrElse(start,
+            //     ctx.newRefinedClassSymbol(coordAt(start))).asClass
+            //   registerSym(start, refineCls)
+            //   typeAtAddr(start) = refineCls.typeRef
+            //   val parent = readTpt()
+            //   val refinements = readStats(refineCls, end)(localContext(refineCls))
+            //   RefinedTypeTree(parent, refinements, refineCls)
             case APPLIEDtpt =>
               // If we do directly a tpd.AppliedType tree we might get a
               // wrong number of arguments in some scenarios reading F-bounded
@@ -1518,7 +1528,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       tpt
     }
 
-    /** TODO tasty: SPECIAL OPTIMAL CASE FOR TEMPLATES */
+    /** TODO [tasty]: SPECIAL OPTIMAL CASE FOR TEMPLATES */
     def readParentFromTerm()(implicit ctx: Context): Type = {  // TODO: rename to readTree
       val sctx = sourceChangeContext()
       if (sctx `ne` ctx) return readParentFromTerm()(sctx)
@@ -1680,7 +1690,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       op: TreeReader => Context => T) extends Trees.Lazy[T] {
     def complete(implicit ctx: Context): T = {
       ctx.log(s"starting to read at ${reader.reader.currentAddr} with owner $owner")
-      Contexts.withPhaseNoLater(ctx.picklerPhase) { implicit ctx =>
+      withPhaseNoLater(ctx.picklerPhase) {
         op(reader)(ctx
           .withOwner(owner))
 //          .withModeBits(mode)
