@@ -18,6 +18,13 @@ object TestRefinements extends Suite("TestRefinements") {
     def fooU = 23
   }
 
+  class MethodicInt extends Refinements.Methodic {
+    def nullary: Int = 23
+    def nillary(): Int = 23
+    def poly[T](): Int = 23
+    val value: Int = 23
+  }
+
   test(assert((new Refinements.Bar[String, Int].bar(new FooStringInt)) == ("I am foo", 23)))
 
   test(assert((new Refinements.Baz[String, Int, FooStringInt].baz(new FooStringInt): (String, Int)) === ("I am foo", 23)))
@@ -26,4 +33,13 @@ object TestRefinements extends Suite("TestRefinements") {
 
   test(assert((new Refinements.Zot[String, Int].zot( new FooString with FooInt )) == ("I am foo", 23)))
 
+  test(assert(new Refinements.Blip[Int, MethodicInt].blip(new MethodicInt) === 23))
+  // test(assert(new Refinements.Blap[Int, MethodicInt].blap(new MethodicInt) === 23)) // METHODtype
+  test(assert(new Refinements.Blam[Int, MethodicInt].blam(new MethodicInt) === 23))
+  // test(assert(new Refinements.Bloc[Int, MethodicInt].bloc(new MethodicInt) === 23)) // POLYtype
+
+  test(assert(new Refinements.Clip[Int].clip(new MethodicInt) === 23))
+  test(assert(new Refinements.Clap[Int].clap(new MethodicInt) === 23))
+  test(assert(new Refinements.Clam[Int].clam(new MethodicInt) === 23))
+  test(assert(new Refinements.Cloc[Int].cloc(new MethodicInt) === 23))
 }
