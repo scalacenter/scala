@@ -32,6 +32,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
   import Signature._
   import Contexts._
 
+  final class TASTyException(msg: String) extends Exception(msg)
+
   @inline
   final protected def assertTasty(cond: Boolean, msg: => String)(implicit ctx: Context): Unit =
     if (!cond) {
@@ -112,8 +114,14 @@ class TreeUnpickler[Tasty <: TastyUniverse](
     self.withTastyFlagSet(tastyFlagSet)
 
     override def complete(sym: Symbol): Unit = {
-      cycleAtAddr(currentAddr) = withPhaseNoLater(ctx.picklerPhase) { // TODO really this needs to construct a new Context from the current symbolTable that this is completed from
-        new TreeReader(reader).readIndexedMember()//(ctx.withOwner(owner).withSource(source))
+      try {
+        cycleAtAddr(currentAddr) = withPhaseNoLater(ctx.picklerPhase) { // TODO really this needs to construct a new Context from the current symbolTable that this is completed from
+          new TreeReader(reader).readIndexedMember()//(ctx.withOwner(owner).withSource(source))
+        }
+      } catch {
+        case err: TASTyException =>
+          sym.info = errorType
+          errorTasty(err.getMessage)
       }
     }
   }
@@ -286,6 +294,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         Constant(null)
       case CLASSconst =>
         Constant(readType())
+      case ENUMconst =>
+        Constant(readTypeRef().termSymbol)
       case _ =>
         sys.error(s"unknown tag ${astTagToString(tag)} when reading constant")
     }
@@ -352,14 +362,20 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             //     case symd: SymDenotation if prefix.isArgPrefixOf(symd.symbol) => TypeRef(prefix, symd.symbol)
             //     case _ => TypeRef(prefix, name, space.decl(name).asSeenFrom(prefix))
             //   }
-            // case REFINEDtype =>
-            //   var name: Name = readName()
-            //   val parent = readType()
-            //   val ttag = nextUnsharedTag
-            //   if (ttag === TYPEBOUNDS || ttag === TYPEALIAS) name = name.toTypeName
-            //   RefinedType(parent, name, readType())
-            //     // Note that the lambda "rt => ..." is not equivalent to a wildcard closure!
-            //     // Eta expansion of the latter puts readType() out of the expression.
+            case REFINEDtype =>
+              var name: Name = readEncodedName()
+              val parent = readType()
+              val ttag = nextUnsharedTag
+              if (ttag === TYPEBOUNDS) name = name.toTypeName
+              val refinement = parent.member(name).cloneSymbol.setInfo(readType())
+              parent match {
+                case parent: RefinedType =>
+                  val scope = parent.decls.cloneScope
+                  scope.enter(refinement)
+                  mkRefinedType(parent.parents, ctx.owner, scope)
+                case parent =>
+                  mkRefinedType(parent :: Nil, ctx.owner, mkScope(refinement))
+              }
             case APPLIEDtype =>
               boundedAppliedType(readType(), until(end)(readType()))
             case TYPEBOUNDS =>
@@ -439,9 +455,6 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             typeAtAddr.getOrElseUpdate(ref, forkAt(ref).readType())
           case BYNAMEtype =>
             defn.ByNameParamClass.ref(readType() :: Nil) // ExprType(readType())
-          case ENUMconst =>
-            errorTasty("Enum Constant") //Constant(readTypeRef().termSymbol)
-            errorType
           case _ =>
             mkConstantType(readConstant(tag))
         }
@@ -1246,6 +1259,26 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 //      readIndexedStats(exprOwner, end)
 //    }
 
+    def readIndexedStatAsSym(exprOwner: Symbol)(implicit ctx: Context): NoCycle = nextByte match {
+      case TYPEDEF | VALDEF | DEFDEF =>
+        readIndexedMember()
+      case IMPORT =>
+        throw new TASTyException("IMPORT in expression")
+      case PACKAGE =>
+        throw new TASTyException("PACKAGE in expression")
+      case _ =>
+        skipTree() // readTerm()(ctx.withOwner(exprOwner))
+        NoCycle(at = NoAddr)
+    }
+
+    def readIndexedStatsAsSyms(exprOwner: Symbol, end: Addr)(implicit ctx: Context): List[NoCycle] =
+      until(end)(readIndexedStatAsSym(exprOwner))
+
+    def readStatsAsSyms(exprOwner: Symbol, end: Addr)(implicit ctx: Context): List[NoCycle] = {
+      fork.indexStats(end)
+      readIndexedStatsAsSyms(exprOwner, end)
+    }
+
     def readIndexedParams[T <: MaybeCycle /*MemberDef*/](tag: Int)(implicit ctx: Context): List[T] =
       collectWhile(nextByte === tag) { readIndexedMember().asInstanceOf[T] }
 
@@ -1451,14 +1484,15 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               val patType = readType()
               val argPats = until(end)(readTerm())
               UnApply(fn, implicitArgs, argPats, patType)
-            // case REFINEDtpt =>
-            //   val refineCls = symAtAddr.getOrElse(start,
-            //     ctx.newRefinedClassSymbol(coordAt(start))).asClass
-            //   registerSym(start, refineCls)
-            //   typeAtAddr(start) = refineCls.typeRef
-            //   val parent = readTpt()
-            //   val refinements = readStats(refineCls, end)(localContext(refineCls))
-            //   RefinedTypeTree(parent, refinements, refineCls)
+            case REFINEDtpt =>
+              val refineCls = symAtAddr.getOrElse(start,
+                ctx.newRefinedClassSymbol(coordAt(start))).asClass
+              registerSym(start, refineCls)
+              typeAtAddr(start) = refineCls.ref
+              val refinedTpe = mkRefinedType(readTpt().tpe :: Nil, refineCls)
+              refineCls.info = refinedTpe
+              readStatsAsSyms(refineCls, end)(localContext(refineCls))
+              TypeTree(refinedTpe)
             case APPLIEDtpt =>
               // If we do directly a tpd.AppliedType tree we might get a
               // wrong number of arguments in some scenarios reading F-bounded
@@ -1651,14 +1685,15 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 //        }
 //      } else NoSpan
 
-//    /** Coordinate for the symbol at `addr`. */
-//    def coordAt(addr: Addr)(implicit ctx: Context): Coord = {
-//      val span = spanAt(addr)
-//      if (span.exists)
-//        spanCoord(span)
-//      else
-//        indexCoord(addr.index)
-//    }
+    /** Coordinate for the symbol at `addr`. */
+    def coordAt(addr: Addr)(implicit ctx: Context): Position /*Coord*/ = {
+      // val span = spanAt(addr)
+      // if (span.exists)
+      //   spanCoord(span)
+      // else
+      //   indexCoord(addr.index)
+      noPosition
+    }
 
     /** Pickled source path at `addr`. */
     def sourcePathAt(addr: Addr)(implicit ctx: Context): String = ""
