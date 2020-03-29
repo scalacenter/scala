@@ -365,39 +365,54 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             //     case _ => TypeRef(prefix, name, space.decl(name).asSeenFrom(prefix))
             //   }
             case REFINEDtype =>
-              var name: Name = readEncodedName()
-              val parent = readType()
-              val ttag = nextUnsharedTag
-              if (ttag === TYPEBOUNDS) name = name.toTypeName
-              var refinedTpe = readType()
-              val refinement = {
-                val memberOrNone = parent.member(name)
-                if (isSymbol(memberOrNone)) {
-                  val refinement = memberOrNone.cloneSymbol
-                  if (refinement.isMethod && refinement.paramss.isEmpty) {
-                    refinedTpe = MethodRefinement.normalise(refinedTpe)
+              val selected = readEncodedName()
+              val parent   = readType()
+              val refinementClass = ctx.owner match {
+                case enclosingRefinement: RefinementClassSymbol =>
+                  enclosingRefinement.rawInfo match {
+                    case EmptyRecTypeInfo => mkRefinedTypeWith(parent :: Nil, enclosingRefinement, mkScope)
+                    case _                => ()
                   }
-                  refinement.setInfo(refinedTpe)
-                }
-                else { // Structural Refinement, dotty only allows vals or non-polymorphic defs
-                  var flags = Method
-                  val info = refinedTpe match {
-                    case ByNameType(res) => mkNullaryMethodType(res) // nullary method
-                    case _: MethodType => refinedTpe
-                    case _ => // val
-                      flags |= Stable | Deferred
-                      mkNullaryMethodType(refinedTpe)
-                  }
-                  ctx.newSymbol(ctx.owner, name, flags, info)
+                  enclosingRefinement
+                case _ => parent match {
+                  case nestedRefinement: RefinedType => nestedRefinement.typeSymbol
+                  case _                             => ctx.newRefinedClassSymbol(noPosition)
                 }
               }
+              val decl = {
+                val isType     = nextUnsharedTag === TYPEBOUNDS
+                val name       = if (isType) selected.toTypeName else selected
+                val tpe        = readType()
+                val overridden = parent.member(name)
+                val isOverride = isSymbol(overridden)
+                var flags      = if (isOverride && overridden.isType) Override else emptyFlags
+                val info = {
+                  if (isType) {
+                    if (tpe.isInstanceOf[TypeBounds]) flags |= Deferred
+                    tpe
+                  }
+                  else {
+                    flags |= Method | Deferred
+                    tpe match {
+                      case byNameType: TypeRef // nullary method
+                      if byNameType.sym == defn.ByNameParamClass && byNameType.args.length == 1 =>
+                        mkNullaryMethodType(byNameType.args.head)
+                      case poly: PolyType if poly.resultType.paramss.isEmpty =>
+                        mkPolyType(poly.typeParams, mkNullaryMethodType(poly.resultType))
+                      case _:MethodType | _:PolyType => tpe
+                      case _ => // val
+                        if (isOverride && overridden.is(Stable)) flags |= Stable
+                        mkNullaryMethodType(tpe)
+                    }
+                  }
+                }
+                ctx.newSymbol(refinementClass, name, flags, info)
+              }
               parent match {
-                case parent: RefinedType =>
-                  val scope = parent.decls.cloneScope
-                  scope.enter(refinement)
-                  mkRefinedTypeWith(parent.parents, parent.typeSymbol, scope)
-                case parent =>
-                  mkRefinedType(parent :: Nil, ctx.owner, mkScope(refinement))
+                case nested: RefinedType =>
+                  mkRefinedTypeWith(nested.parents, refinementClass, nested.decls.cloneScope.tap(_.enter(decl)))
+                case _ =>
+                  mkRefinedTypeWith(parent :: Nil, refinementClass, mkScope(decl))
               }
             case APPLIEDtype =>
               boundedAppliedType(readType(), until(end)(readType()))
@@ -467,16 +482,18 @@ class TreeUnpickler[Tasty <: TastyUniverse](
                 skipTree(tag)
                 tp
               case None =>
-                sys.error("RECtype")//RecType(rt => registeringType(rt, readType()))
+                mkRecType(rt =>
+                  registeringTypeWith(rt, readType()(ctx.withOwner(rt.refinementClass)))
+                ).tap(typeAtAddr(start) = _)
             }
           case RECthis =>
-            sys.error("RECthis")//readTypeRef().asInstanceOf[RecType].recThis
+            readTypeRef().asInstanceOf[RecType].recThis
           case SHAREDtype =>
             val ref = readAddr()
             typeAtAddr.getOrElseUpdate(ref, forkAt(ref).readType())
           case BYNAMEtype =>
             val tpe = readType()
-            defn.ByNameParamClass.ref(tpe :: Nil) // ExprType(readType())
+            defn.byNameType(tpe) // ExprType(readType())
           case _ =>
             mkConstantType(readConstant(tag))
         }
@@ -1516,14 +1533,12 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               val argPats = until(end)(readTerm())
               UnApply(fn, implicitArgs, argPats, patType)
             case REFINEDtpt =>
-              val refineCls = symAtAddr.getOrElse(start,
-                ctx.newRefinedClassSymbol(coordAt(start))).asClass
+              val refineCls = symAtAddr.getOrElse(start, ctx.newRefinedClassSymbol(coordAt(start)))
               registerSym(start, refineCls)
               typeAtAddr(start) = refineCls.ref
-              val refinedTpe = mkRefinedType(readTpt().tpe :: Nil, refineCls)
-              refineCls.info = refinedTpe
+              val refinement = mkRefinedType(readTpt().tpe :: Nil, refineCls)
               readStatsAsSyms(refineCls, end)(localContext(refineCls))
-              TypeTree(refinedTpe)
+              TypeTree(refinement)
             case APPLIEDtpt =>
               // If we do directly a tpd.AppliedType tree we might get a
               // wrong number of arguments in some scenarios reading F-bounded

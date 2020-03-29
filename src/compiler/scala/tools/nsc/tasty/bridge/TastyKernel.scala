@@ -6,6 +6,8 @@ import nsc.tasty.{SafeEq, TastyUniverse}
 import nsc.tasty.TastyFlags.{EmptyTastyFlags, TastyFlagSet}
 import nsc.tasty.Names.TastyName, TastyName._
 
+import scala.util.chaining._
+
 import scala.reflect.internal
 
 trait TastyKernel { self: TastyUniverse =>
@@ -71,7 +73,7 @@ trait TastyKernel { self: TastyUniverse =>
   final def mkSingleType(pre: Type, sym: Symbol): Type = symbolTable.singleType(pre, sym)
   final def mkNullaryMethodType(res: Type): NullaryMethodType = symbolTable.internal.nullaryMethodType(res)
   private[bridge] final def mkMethodType(params: List[Symbol], res: Type): MethodType = symbolTable.internal.methodType(params, res)
-  private[bridge] final def mkPolyType(params: List[Symbol], res: Type): PolyType = symbolTable.internal.polyType(params, res)
+  final def mkPolyType(params: List[Symbol], res: Type): PolyType = symbolTable.internal.polyType(params, res)
   private[bridge] final def mkTypeRef(tpe: Type, sym: Symbol, args: List[Type]): Type = symbolTable.typeRef(tpe, sym, args)
   private[bridge] final def mkAppliedType(sym: Symbol, args: List[Type]): Type = symbolTable.appliedType(sym, args)
   private[bridge] final def mkAppliedType(tycon: Type, args: List[Type]): Type = symbolTable.appliedType(tycon, args)
@@ -82,8 +84,7 @@ trait TastyKernel { self: TastyUniverse =>
   final def mkIntersectionType(tps: Type*): Type = mkIntersectionType(tps.toList)
   final def mkIntersectionType(tps: List[Type]): Type = symbolTable.internal.intersectionType(tps)
   final def mkAnnotatedType(tpe: Type, annot: Annotation): AnnotatedType = symbolTable.AnnotatedType(annot :: Nil, tpe)
-  final def mkRefinedType(parents: List[Type], owner: Symbol, scope: Scope): Type = symbolTable.refinedType(parents, owner, scope, noPosition)
-  final def mkRefinedTypeWith(parents: List[Type], clazz: Symbol, scope: Scope): RefinedType = symbolTable.RefinedType.apply(parents, scope, clazz)
+  final def mkRefinedTypeWith(parents: List[Type], clazz: Symbol, decls: Scope): RefinedType = symbolTable.RefinedType.apply(parents, decls, clazz).tap(clazz.info = _)
   final def mkRefinedType(parents: List[Type], clazz: Symbol): RefinedType = mkRefinedTypeWith(parents, clazz, mkScope)
   final def mkSuperType(thisTpe: Type, superTpe: Type): Type = symbolTable.SuperType(thisTpe, superTpe)
 
