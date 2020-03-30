@@ -346,24 +346,16 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 
         val result =
           (tag: @switch) match {
-            // case TERMREFin =>
-            //   var sname = readName()
-            //   val prefix = readType()
-            //   val space = readType()
-            //   sname match {
-            //     case SignedName(name, sig) =>
-            //       TermRef(prefix, name, space.decl(name).asSeenFrom(prefix).atSignature(sig))
-            //     case name =>
-            //       TermRef(prefix, name, space.decl(name).asSeenFrom(prefix))
-            //   }
-            // case TYPEREFin =>
-            //   val name = readName().toTypeName
-            //   val prefix = readType()
-            //   val space = readType()
-            //   space.decl(name) match {
-            //     case symd: SymDenotation if prefix.isArgPrefixOf(symd.symbol) => TypeRef(prefix, symd.symbol)
-            //     case _ => TypeRef(prefix, name, space.decl(name).asSeenFrom(prefix))
-            //   }
+            case TERMREFin =>
+              var name   = readTastyName()
+              val prefix = readType()
+              val space  = readType()
+              selectTerm(prefix, space, name)
+            case TYPEREFin =>
+              val name   = readTastyName()
+              val prefix = readType()
+              val space  = readType()
+              selectType(prefix, space, name)
             case REFINEDtype =>
               val selected = readEncodedName()
               val parent   = readType()
@@ -463,13 +455,13 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           case TERMREFpkg =>
             readPackageRef().termRef
           case TYPEREF =>
-            val name = readTastyName()
-            val pre  = readType()
-            selectType(pre, name)
-          case TERMREF =>
-            val name  = readTastyName()
+            val name   = readTastyName()
             val prefix = readType()
-            selectTerm(prefix, name)
+            selectType(prefix, prefix, name)
+          case TERMREF =>
+            val name   = readTastyName()
+            val prefix = readType()
+            selectTerm(prefix, prefix, name)
           case THIS =>
             val sym = readType() match {
               case tpe: TypeRef => tpe.sym
@@ -1692,7 +1684,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 //    def readLater[T <: AnyRef](end: Addr, op: TreeReader => Context => T)(implicit ctx: Context): Trees.Lazy[T] =
 //      readLaterWithOwner(end, op)(ctx)(ctx.owner)
 
-    def readLaterWithOwner[T <: AnyRef](end: Addr, op: TreeReader => Context => T)(implicit ctx: Context): Symbol => Trees.Lazy[T] = {
+    def readLaterWithOwner[T <: AnyRef](end: Addr, op: TreeReader => Context => T)(implicit ctx: Context): Symbol => Trees.Lazy[Option[T]] = {
       val localReader = fork
       goto(end)
       owner => new LazyReader(localReader, owner/*, ctx.mode*/, ctx.source, op)
@@ -1782,14 +1774,23 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 
   class LazyReader[T <: AnyRef](
       reader: TreeReader, owner: Symbol/*, mode: Mode*/, source: AbstractFile,
-      op: TreeReader => Context => T) extends Trees.Lazy[T] {
-    def complete(implicit ctx: Context): T = {
-      ctx.log(s"starting to read at ${reader.reader.currentAddr} with owner $owner")
-      withPhaseNoLater(ctx.picklerPhase) {
-        op(reader)(ctx
-          .withOwner(owner))
-//          .withModeBits(mode)
-//          .withSource(source))
+      op: TreeReader => Context => T) extends Trees.Lazy[Option[T]] {
+    def complete(implicit ctx: Context): Option[T] = {
+      try {
+        ctx.log(s"starting to read at ${reader.reader.currentAddr} with owner $owner")
+        withPhaseNoLater(ctx.picklerPhase) {
+          Some(
+            op(reader)(ctx
+              .withOwner(owner)
+              // .withModeBits(mode)
+              // .withSource(source)
+            )
+          )
+        }
+      } catch {
+        case err: TASTyException =>
+          errorTasty(s"${err.getMessage} on ${err.sym}")
+          None
       }
     }
   }
