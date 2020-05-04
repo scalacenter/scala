@@ -28,6 +28,8 @@ object Signature {
 
   type ParamSig[T] = Either[Int, T]
 
+  def merge[T](sb: StringBuilder, sig: Signature[T]): StringBuilder = sig.mergeShow(sb)
+
   def apply[T](params: List[ParamSig[T]], result: T): MethodSignature[T] = new MethodSignature(params, result)
 
   case class MethodSignature[T] private[Signature](params: List[ParamSig[T]], result: T) extends Signature[T] {
