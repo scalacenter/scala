@@ -922,7 +922,7 @@ lazy val runnerArgsParser = Def.setting {
 }
 
 lazy val tasty = project.in(file("test") / "tasty")
-  .settings(instanceSettings)
+  .settings(commonSettings)
   .dependsOn(tastytest)
   .settings(disableDocs)
   .settings(skip in publish := true)
@@ -934,7 +934,8 @@ lazy val tasty = project.in(file("test") / "tasty")
       s"-Dtastytest.src=${baseDirectory.value}",
       s"-Dtastytest.packageName=tastytest"
     ),
-    sourceDirectory in Test := baseDirectory.value/"test",
+    Compile / unmanagedSourceDirectories := Nil,
+    Test    / unmanagedSourceDirectories := List(baseDirectory.value/"test"),
     dotc := (Def.inputTaskDyn {
       import complete.DefaultParsers._
       var outDir ~ src ~ _ = tastycArgsParser.parsed
