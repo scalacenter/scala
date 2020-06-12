@@ -55,7 +55,8 @@ object TastyFlags {
   final val Given                 = Extension.next
   final val Exported              = Given.next
   final val Macro                 = Exported.next
-  final val Enum                  = Macro.next
+  final val SuperTrait            = Macro.next
+  final val Enum                  = SuperTrait.next
   final val Open                  = Enum.next
   final val ParamAlias            = Open.next
 
@@ -132,6 +133,7 @@ object TastyFlags {
             case Given => "Given"
             case Exported => "Exported"
             case Macro => "Macro"
+            case SuperTrait => "SuperTrait"
             case Enum => "Enum"
             case Open => "Open"
             case ParamAlias => "ParamAlias"

@@ -581,6 +581,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           case STATIC => addFlag(Static)
           case OBJECT => addFlag(Object)
           case TRAIT => addFlag(Trait)
+          case SUPERTRAIT => addFlag(SuperTrait)
           case ENUM => addFlag(Enum)
           case LOCAL => addFlag(Local)
           case SYNTHETIC => addFlag(Synthetic)
@@ -753,7 +754,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               else tpe
             )
           case TYPEDEF | TYPEPARAM =>
-            val unsupported = completer.tastyFlagSet &~ (Enum | Open | Opaque | Exported)
+            val unsupported = completer.tastyFlagSet &~ (Enum | Open | Opaque | Exported | SuperTrait)
             unsupportedWhen(unsupported.hasFlags, s"flags on $sym: ${showTasty(unsupported)}")
             if (sym.isClass) {
               sym.owner.ensureCompleted()
@@ -899,7 +900,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       def completeSelect(name: TastyName)(implicit ctx: Context): Tree = {
         val localCtx = ctx.selectionCtx(name)
         val qual     = readTerm()(localCtx)
-        val qualType = qual.tpe
+        val qualType = qual.tpe // TODO [tasty]: qual.tpe.widenIfUnstable
         tpd.Select(qual, name)(namedMemberOfPrefix(qualType, name)(localCtx))
       }
 
@@ -993,6 +994,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             case UNAPPLY     => unsupportedTermTreeError("unapply pattern")
             case INLINED     => unsupportedTermTreeError("inlined expression")
             case SELECTouter => metaprogrammingIsUnsupported // only within inline
+            case SELECTin    => unsupportedTermTreeError("selection with a prefix") // TODO [tasty]: find test case to trigger this
             case HOLE        => assertNoMacroHole
             case _           => readPathTerm()
           }
