@@ -15,7 +15,7 @@ package scala.tools.nsc.tasty.bridge
 import scala.annotation.tailrec
 import scala.reflect.io.AbstractFile
 
-import scala.tools.tasty.{TastyName, TastyFlags}, TastyFlags._
+import scala.tools.tasty.{TastyName, TastyFlags}, TastyFlags._, TastyName.ObjectName
 import scala.tools.nsc.tasty.{TastyUniverse, TastyModes, SafeEq}, TastyModes._
 import scala.reflect.internal.MissingRequirementError
 
@@ -24,7 +24,7 @@ trait ContextOps { self: TastyUniverse =>
 
   private def describeOwner(owner: Symbol): String = {
     val kind =
-      if (owner.is(Param)) {
+      if (owner.isOneOf(Param | ParamSetter)) {
         if (owner.isType) "type parameter"
         else "parameter"
       }
@@ -60,7 +60,7 @@ trait ContextOps { self: TastyUniverse =>
   @inline final def assert(assertion: Boolean): Unit =
     if (!assertion) assertError("")
 
-  sealed abstract class Context {
+  sealed abstract class Context { thisCtx =>
 
     final def globallyVisibleOwner: Symbol = owner.logicallyEnclosingMember
 
@@ -100,14 +100,8 @@ trait ContextOps { self: TastyUniverse =>
       symOrDependencyError(false, true, fullname)(loadingMirror.getPackage(encodeTermName(fullname).toString))
     }
 
-    final def requiredClass(fullname: TastyName.TypeName): Symbol =
-      symOrDependencyError(false, false, fullname)(loadingMirror.getRequiredClass(encodeTypeName(fullname).toString))
-
     final def optionalClass(fullname: TastyName.TypeName): Option[Symbol] =
       loadingMirror.getClassIfDefined(encodeTypeName(fullname).toString).toOption
-
-    final def requiredObject(fullname: TastyName.ObjectName): Symbol =
-      symOrDependencyError(true, false, fullname)(loadingMirror.getRequiredModule(encodeTermName(fullname).toString))
 
     private def symOrDependencyError(isObject: Boolean, isPackage: Boolean, fullname: TastyName)(sym: => Symbol): Symbol = {
       try sym

@@ -13,6 +13,11 @@
 package scala.tools.tasty
 
 import scala.reflect.NameTransformer
+import scala.tools.tasty.TastyName.SimpleName
+import scala.tools.tasty.TastyName.ObjectName
+import scala.tools.tasty.TastyName.SignedName
+import scala.tools.tasty.TastyName.DefaultName
+import scala.tools.tasty.TastyName.TypeName
 
 object TastyName {
 
@@ -157,6 +162,18 @@ object TastyName {
       case name: DefaultName => traverse(sb, name.qual) append DefaultGetterStr append (name.num + 1)
     }
 
+  }
+
+  def deepEncode(name: TastyName): TastyName = name match {
+    case SimpleName(raw) => SimpleName(NameTransformer.encode(raw))
+    case QualifiedName(qual, sep, selector) => QualifiedName(deepEncode(qual), sep, deepEncode(selector).asSimpleName)
+    case ObjectName(base) => ObjectName(deepEncode(base))
+    case UniqueName(qual, sep, num) => UniqueName(deepEncode(qual), sep, num)
+    case DefaultName(qual, num) => DefaultName(deepEncode(qual), num)
+    case PrefixName(prefix, qual) => PrefixName(prefix, deepEncode(qual))
+    case SuffixName(qual, suffix) => SuffixName(deepEncode(qual), suffix)
+    case TypeName(base) => TypeName(deepEncode(base))
+    case SignedName(qual, sig) => SignedName(deepEncode(qual), sig.map(_.encode))
   }
 
 }

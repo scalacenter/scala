@@ -280,6 +280,7 @@ trait StdNames {
     final val TypeName: NameType            = nameType("TypeName")
     final val TypeDef: NameType             = nameType("TypeDef")
     final val Quasiquote: NameType          = nameType("Quasiquote")
+    final val TastyMacroImpl: NameType      = nameType("TastyMacroImpl")
 
     // quasiquote-specific names
     final val QUASIQUOTE_FUNCTION: NameType     = nameType("$quasiquote$function$")

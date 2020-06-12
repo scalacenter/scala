@@ -22,7 +22,7 @@ object Dotc {
     }
   }
 
-  def dotc(out: String, classpath: String, sources: String*): Try[Boolean] = {
+  def dotc(out: String, classpath: String, additionalSettings: Seq[String], sources: String*): Try[Boolean] = {
     if (sources.isEmpty) {
       Success(true)
     }
@@ -34,14 +34,14 @@ object Dotc {
         "-Yerased-terms",
         "-Xfatal-warnings",
         "-usejavacp"
-      ) ++ sources
+      ) ++ additionalSettings ++ sources
       dotcProcess(args)
     }
   }
 
   def main(args: Array[String]): Unit = {
     val Array(out, src) = args
-    val success = dotc(out, out, src).get
+    val success = dotc(out, out, Nil, src).get
     sys.exit(if (success) 0 else 1)
   }
 }
