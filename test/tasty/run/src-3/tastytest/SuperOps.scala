@@ -1,5 +1,3 @@
 package tastytest
 
-super trait SuperOps {
-  def foo = 23
-}
+super trait SuperOps[Impl <: SuperOps[Impl]]
