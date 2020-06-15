@@ -54,6 +54,9 @@ trait TypeOps { self: TastyUniverse =>
     def TypeBounds(lo: Type, hi: Type): Type = u.TypeBounds.apply(lo, hi)
     def SingleType(pre: Type, sym: Symbol): Type = u.singleType(pre, sym)
     def ExprType(res: Type): Type = ui.nullaryMethodType(res)
+    def InlineExprType(res: Type): Type = res match {
+      case u.ConstantType(value) => u.NullaryMethodType(u.FoldableConstantType(value))
+    }
     def PolyType(params: List[Symbol], res: Type): Type = ui.polyType(params, res)
     def ClassInfoType(parents: List[Type], clazz: Symbol): Type = ui.classInfoType(parents, clazz.rawInfo.decls, clazz.asType)
     def ThisType(sym: Symbol): Type = ui.thisType(sym)

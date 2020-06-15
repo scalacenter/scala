@@ -407,8 +407,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       if (isClass && flags.is(Trait)) flags |= Abstract
       if (tag === DEFDEF) flags |= Method
       if (tag === VALDEF) {
+        if (flags.is(Inline) || owner.is(Trait)) flags |= FieldAccessor
         if (flags.not(Mutable)) flags |= Stable
-        if (owner.is(Trait)) flags |= FieldAccessor
       }
       if (tastyFlags.is(Object))
         flags = flags | (if (tag === VALDEF) ObjectCreationFlags else ObjectClassCreationFlags)
@@ -747,9 +747,11 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             val unsupported = completer.tastyFlagSet &~ (Inline | Enum | Extension | Exported)
             unsupportedWhen(unsupported.hasFlags, s"flags on $sym: ${showTasty(unsupported)}")
             val tpe = readTpt()(localCtx).tpe
-            if (isInline) unsupportedWhen(!isConstantType(tpe), s"inline val ${sym.nameString} with non-constant type $tpe")
+            val isConstant = isConstantType(tpe)
+            if (isInline) unsupportedWhen(!isConstant, s"inline val ${sym.nameString} with non-constant type $tpe")
             ctx.setInfo(sym,
               if (completer.tastyFlagSet.is(Enum)) defn.ConstantType(tpd.Constant((sym, tpe))).tap(_.typeSymbol.set(Final))
+              else if (isInline && isConstant) defn.InlineExprType(tpe)
               else if (sym.isMethod) defn.ExprType(tpe)
               else tpe
             )
