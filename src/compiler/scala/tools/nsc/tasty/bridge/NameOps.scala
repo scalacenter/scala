@@ -45,6 +45,7 @@ trait NameOps { self: TastyUniverse =>
   object tpnme {
     final val Or: TypeName = TastyName.SimpleName("|").toTypeName
     final val And: TypeName = TastyName.SimpleName("&").toTypeName
+    final val AnyKind: TypeName = TastyName.SimpleName("AnyKind").toTypeName
 
     final val ScalaAnnotationInternal_Repeated: TypeName =
       TastyName.qualifiedClass("scala", "annotation", "internal", "Repeated")
