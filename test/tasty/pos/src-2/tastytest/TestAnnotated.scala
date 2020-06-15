@@ -7,4 +7,5 @@ object TestAnnotated {
     val o = new OuterAnnotated {}
     o.foo
   }
+  def test4 = new SelectInAnnotated.AmbiguousAnnotated {}
 }
