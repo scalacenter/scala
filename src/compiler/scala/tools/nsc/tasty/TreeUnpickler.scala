@@ -934,6 +934,22 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         val end = readEnd()
         val result =
           (tag: @switch) match {
+            case SELECTin =>
+              if (inParentCtor) unsupportedTermTreeError("selection with a prefix in a parent")
+              else unsupportedTermTreeError("selection with a prefix")
+              // val sname = readTastyName()
+              // val qual  = readTerm()
+              // val owner = readType()
+              // def select(name: TastyName, denot: Symbol) = {
+              //   val prefix = ctx.typeAssigner.maybeSkolemizePrefix(qual.tpe.widenIfUnstable, name)
+              //   makeSelect(qual, name, denot.asSeenFrom(prefix))
+              // }
+              // sname match {
+              //   case TastyName.SignedName(name, sig) =>
+              //     select(name, owner.decl(name).atSignature(sig))
+              //   case name =>
+              //     select(name, owner.decl(name))
+              // }
             case SUPER =>
               val qual = readTerm()
               val (mixId, mixTpe) = ifBefore(end)(readQualId(), (untpd.EmptyTypeIdent, defn.NoType))
@@ -996,7 +1012,6 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             case UNAPPLY     => unsupportedTermTreeError("unapply pattern")
             case INLINED     => unsupportedTermTreeError("inlined expression")
             case SELECTouter => metaprogrammingIsUnsupported // only within inline
-            case SELECTin    => unsupportedTermTreeError("selection with a prefix") // TODO [tasty]: find test case to trigger this
             case HOLE        => assertNoMacroHole
             case _           => readPathTerm()
           }

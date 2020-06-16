@@ -21,3 +21,12 @@ object SelectInAnnotated {
   trait AmbiguousAnnotated
 
 }
+
+object SelectInAnnotatedinParent {
+
+  val ambig = new Ambiguous.AmbiguousBox[Double]
+
+  @ambig.annotBox(0)
+  trait AmbiguousAnnotated
+
+}

@@ -5,3 +5,9 @@ class Ambiguous[T] {
     def this(elem: T) = this(new Box[T](elem))
   }
 }
+
+object Ambiguous {
+  class AmbiguousBox[T] extends Ambiguous[Box[T]] {
+    class annotBox(elem: T) extends annot(new Box(elem))
+  }
+}

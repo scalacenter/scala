@@ -8,4 +8,5 @@ object TestAnnotated {
     o.foo
   }
   def test4 = new SelectInAnnotated.AmbiguousAnnotated {}
+  def test5 = new SelectInAnnotatedinParent.AmbiguousAnnotated {}
 }
