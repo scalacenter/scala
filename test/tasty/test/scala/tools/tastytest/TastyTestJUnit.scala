@@ -43,6 +43,15 @@ class TastyTestJUnit {
     additionalDottySettings = Nil
   ).get
 
+  @test def negMoveMacros(): Unit = TastyTest.negChangePreSuite(
+    src                     = "neg-move-macros",
+    srcRoot                 = assertPropIsSet(propSrc),
+    pkgName                 = assertPropIsSet(propPkgName),
+    outDirs                 = None,
+    additionalSettings      = Nil,
+    additionalDottySettings = Nil
+  ).get
+
   @test def negIsolated(): Unit = TastyTest.negSuiteIsolated(
     src                     = "neg-isolated",
     srcRoot                 = assertPropIsSet(propSrc),

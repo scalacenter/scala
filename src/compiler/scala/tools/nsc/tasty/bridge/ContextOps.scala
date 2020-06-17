@@ -18,6 +18,7 @@ import scala.reflect.io.AbstractFile
 import scala.tools.tasty.{TastyName, TastyFlags}, TastyFlags._, TastyName.ObjectName
 import scala.tools.nsc.tasty.{TastyUniverse, TastyModes, SafeEq}, TastyModes._
 import scala.reflect.internal.MissingRequirementError
+import scala.collection.mutable
 
 trait ContextOps { self: TastyUniverse =>
   import self.{symbolTable => u}, u.{internal => ui}
@@ -67,6 +68,25 @@ trait ContextOps { self: TastyUniverse =>
     final def ignoreAnnotations: Boolean = u.settings.YtastyNoAnnotations
     final def verboseDebug: Boolean = u.settings.debug
 
+    def isScala3Macro(sym: Symbol): Boolean = isScala3Inline(sym) && sym.is(Macro)
+    def isScala3Inline(sym: Symbol): Boolean = sym.completer.tastyFlagSet.is(Inline)
+    def isScala2Macro(sym: Symbol): Boolean = sym.completer.tastyFlagSet.is(Erased) && sym.is(Macro)
+
+    def isLatentCandidate(sym: Symbol): Boolean = isScala3Inline(sym) || isScala2Macro(sym)
+
+    def canEnter(decl: Symbol): Boolean = !isScala3Macro(decl)
+    def enter(clazz: Symbol, decl: Symbol): Unit = enter(clazz.rawInfo.decls, decl)
+    private[ContextOps] def enter(decls: u.Scope, decl: Symbol): Unit = {
+      if (allowsOverload(decl)) {
+        if (canEnterOverload(decl)) {
+          decls.enter(decl)
+        }
+      }
+      else {
+        decls.enterIfNew(decl)
+      }
+    }
+
     def canEnterOverload(decl: Symbol): Boolean = {
       !(decl.isModule && isSymbol(findObject(decl.name)))
     }
@@ -91,6 +111,9 @@ trait ContextOps { self: TastyUniverse =>
     def owner: Symbol
     def source: AbstractFile
     def mode: TastyMode
+
+    def registerLatent(sym: Symbol): Unit
+    def enterLatents(): Unit
 
     private final def loadingMirror: u.Mirror = u.mirrorThatLoaded(owner)
 
@@ -390,11 +413,46 @@ trait ContextOps { self: TastyUniverse =>
   final class InitialContext(val topLevelClass: Symbol, val source: AbstractFile) extends Context {
     def mode: TastyMode = EmptyTastyMode
     def owner: Symbol = topLevelClass.owner
+    def registerLatent(sym: Symbol): Unit = ()
+    def enterLatents(): Unit = ()
   }
 
   final class FreshContext(val owner: Symbol, val outer: Context, val mode: TastyMode) extends Context {
     private[this] var mySource: AbstractFile = null
+    private[this] var myLatentDefs: mutable.ArrayBuffer[Symbol] = null
+    private[this] var myMacros: mutable.ArrayBuffer[Symbol] = null
     def atSource(source: AbstractFile): this.type = { mySource = source ; this }
     def source: AbstractFile = if (mySource == null) outer.source else mySource
+    def registerLatent(sym: Symbol): Unit = {
+      if (isScala2Macro(sym)) {
+        val macros = {
+          if (myMacros == null) myMacros = mutable.ArrayBuffer.empty
+          myMacros
+        }
+        macros += sym
+      } else {
+        val defs = {
+          if (myLatentDefs == null) myLatentDefs = mutable.ArrayBuffer.empty
+          myLatentDefs
+        }
+        defs += sym
+      }
+    }
+    def enterLatents(): Unit = {
+      for {
+        owner  <- Option.when(owner.isClass)(owner)
+        defs   <- Option(myLatentDefs)
+      } {
+        val macros = Option(myMacros).getOrElse(mutable.ArrayBuffer.empty)
+        val decls = owner.rawInfo.decls
+        for (d <- defs if !macros.exists(_.name == d.name)) {
+          enter(decls, d)
+        }
+        defs.clear()
+        macros.clear()
+      }
+      myLatentDefs = null
+      myMacros = null
+    }
   }
 }

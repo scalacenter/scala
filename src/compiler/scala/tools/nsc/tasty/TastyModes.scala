@@ -22,6 +22,8 @@ object TastyModes {
   final val ReadParents: TastyMode    = TastyMode(1 << 0)
   final val ReadAnnotation: TastyMode = TastyMode(1 << 1)
   final val OuterTerm: TastyMode      = TastyMode(1 << 2)
+  final val ReadMacro: TastyMode      = TastyMode(1 << 3)
+  final val IndexBody: TastyMode      = TastyMode(1 << 4)
 
   case class TastyMode(val toInt: Int) extends AnyVal { mode =>
 
@@ -39,6 +41,8 @@ object TastyModes {
         if (mode.is(ReadParents)) sb += "ReadParents"
         if (mode.is(ReadAnnotation)) sb += "ReadAnnotation"
         if (mode.is(OuterTerm)) sb += "OuterTerm"
+        if (mode.is(ReadMacro)) sb += "ReadMacro"
+        if (mode.is(IndexBody)) sb += "IndexBody"
         sb.mkString("|")
       }
     }

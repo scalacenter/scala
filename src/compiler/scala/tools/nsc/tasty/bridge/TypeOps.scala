@@ -21,6 +21,7 @@ import scala.util.chaining._
 
 import scala.collection.mutable
 import scala.reflect.internal.Flags
+import scala.tools.tasty.TastyName.QualifiedName
 
 trait TypeOps { self: TastyUniverse =>
   import self.{symbolTable => u}, u.{internal => ui}

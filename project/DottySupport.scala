@@ -12,7 +12,7 @@ import sbt.librarymanagement.{
   * Settings to support validation of TastyUnpickler against the release of dotty with the matching TASTy version
   */
 object TastySupport {
-  val supportedTASTyRelease = "0.25.0-RC1" // TASTy version 23
+  val supportedTASTyRelease = "0.25.0-RC2" // TASTy version 23
   val dottyCompiler = "ch.epfl.lamp" % "dotty-compiler_0.25" % supportedTASTyRelease
 }
 
