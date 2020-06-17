@@ -83,7 +83,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
     ownerTree = new OwnerTree(NoAddr, 0, rdr.fork, reader.endAddr)
     def indexTopLevel(implicit ctx: Context): Unit = rdr.indexStats(reader.endAddr)
     if (rdr.isTopLevel)
-      inIndexingContext(indexTopLevel(_))
+      inIndexStatsContext(indexTopLevel(_))
   }
 
   class Completer(reader: TastyReader, originalFlagSet: TastyFlagSet)(implicit ctx: Context) extends TastyLazyType(originalFlagSet) { self =>
@@ -505,7 +505,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           ctx.findOuterClassTypeParameter(name.toTypeName)
         }
         else {
-          val completer = new Completer(subReader(start, end), flags)(ctx.retractMode(IndexStats))
+          val completer = new Completer(subReader(start, end), flags)(ctx.retractMode(IndexScopedStats))
           ctx.findRootSymbol(roots, name) match {
             case Some(rootd) =>
               ctx.adjustSymbol(rootd, flags, completer, privateWithin) // dotty "removes one completion" here from the flags, which is not possible in nsc
@@ -520,9 +520,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       if (tag == VALDEF && flags.is(SingletonEnumFlags))
         ctx.markAsEnumSingleton(sym)
       registerSym(start, sym)
-      if (canEnterInClass && ctx.owner.isClass) {
-        ctx.enterIfUnseen(declaringSymbolOf(sym))
-      }
+      if (canEnterInClass && ctx.owner.isClass)
+        ctx.enterIfUnseen(sym)
       if (isClass) {
         ctx.initialiseClassScope(sym)
         val localCtx = ctx.withOwner(sym)
@@ -616,7 +615,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       val deferred = readLaterWithOwner(end, rdr => ctx => {
         ctx.log(s"${rdr.reader.currentAddr} reading LazyAnnotationRef[${annotSym.fullName}](<lazy>)")
         rdr.readTerm()(ctx)
-      })(annotCtx.retractMode(IndexStats))
+      })(annotCtx.retractMode(IndexScopedStats))
       ctx.log(s">>> $start LazyAnnotationRef[${annotSym.fullName}](<lazy>)")
       new DeferredAnnotation(deferred)
     }
@@ -713,11 +712,13 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         tag match {
           case DEFDEF =>
             val tastyOnlyFlags = completer.tastyOnlyFlags
-            val unsupported = tastyOnlyFlags &~ (Extension | Inline | Macro | Exported)
+            ctx.log(s"$sym has flags ${completer.originalFlagSet.debug}")
+            val unsupported = tastyOnlyFlags &~ (Extension | Inline | Exported | Erased)
             unsupportedWhen(unsupported.hasFlags, s"flags on $sym: ${showTasty(unsupported)}")
             if (tastyOnlyFlags.is(Extension)) ctx.log(s"$tname is a Scala 3 extension method.")
-            unsupportedWhen(tastyOnlyFlags.is(Inline, butNot = Macro), s"inline $sym")
-            unsupportedWhen(tastyOnlyFlags.is(Inline | Macro), s"macro $sym")
+            unsupportedWhen(tastyOnlyFlags.is(Inline), s"${if (sym.is(Macro)) "" else "inline "}$sym")
+            val isMacroDef = tastyOnlyFlags.is(Erased) && sym.is(Macro)
+            unsupportedWhen(tastyOnlyFlags.is(Erased) && !isMacroDef, s"erased $sym")
             val isCtor = sym.isClassConstructor
             val typeParams = {
               if (isCtor) {
@@ -730,6 +731,10 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             }
             val vparamss = readParamss(localCtx)
             val tpt = readTpt()(localCtx)
+            if (isMacroDef) {
+              val impl = tpd.Macro(readTerm()(ctx.addMode(ReadMacro)))
+              sym.addAnnotation(symbolTable.AnnotationInfo(symbolTable.definitions.MacroTastyImplAnnotation.tpe, List(impl), Nil))
+            }
             val valueParamss = normalizeIfConstructor(vparamss.map(_.map(symFromNoCycle)), isCtor)
             val resType = effectiveResultType(sym, typeParams, tpt.tpe)
             ctx.setInfo(sym, defn.DefDefType(if (isCtor) Nil else typeParams, valueParamss, resType))
@@ -861,7 +866,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         setInfoWithParents(tparams, parentTypes)
       }
 
-      inIndexingContext(traverseTemplate()(_))
+      inIndexScopedStatsContext(traverseTemplate()(_))
 
     }
 
@@ -884,7 +889,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 
     def readStatsAsSyms(exprOwner: Symbol, end: Addr)(implicit ctx: Context): List[NoCycle] = {
       def forkAndIndexStats(implicit ctx: Context): Unit = fork.indexStats(end)
-      inIndexingContext(forkAndIndexStats(_))
+      inIndexStatsContext(forkAndIndexStats(_))
       readIndexedStatsAsSyms(exprOwner, end)
     }
 
@@ -1013,7 +1018,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               if (alias != untpd.EmptyTree) alias // only for opaque type alias
               else tpd.TypeBoundsTree(lo, hi)
             case BLOCK =>
-              if (inParentCtor) {
+              if (inParentCtor | ctx.mode.is(ReadMacro)) {
                 val exprReader = fork
                 skipTree()
                 until(end)(skipTree()) //val stats = readStats(ctx.owner, end)

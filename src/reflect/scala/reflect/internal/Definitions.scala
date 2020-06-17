@@ -569,6 +569,33 @@ trait Definitions extends api.StandardDefinitions {
          def MacroContextWeakTypeTagClass = BlackboxContextClass.map(sym => getTypeMember(sym, tpnme.WeakTypeTag))
          def MacroContextTreeType         = BlackboxContextClass.map(sym => getTypeMember(sym, tpnme.Tree))
     lazy val MacroImplAnnotation          = requiredClass[scala.reflect.macros.internal.macroImpl]
+    lazy val MacroInternalPackage         = MacroImplAnnotation.owner.suchThat(_.isPackageClass)
+
+    /** Implementation of a class that is identical to `scala.reflect.macros.internal.macroImpl` but only exists at compileTime
+     */
+    lazy val MacroTastyImplAnnotation = {
+      val TastyMacroImpl = MacroInternalPackage.newClassSymbol(tpnme.TastyMacroImpl, NoPosition)
+      TastyMacroImpl.setPrivateWithin(ScalaPackage)
+      TastyMacroImpl.setInfoAndEnter(ClassInfoType(AnnotationClass.tpe :: Nil, newScope, TastyMacroImpl))
+      // getter
+      val unpickledMacroImplMeth = TastyMacroImpl.newMethod(nme.unpickledMacroImpl, newFlags = STABLE | ACCESSOR | PARAMACCESSOR)
+      unpickledMacroImplMeth.setInfo(internal.nullaryMethodType(AnyTpe)).markAllCompleted()
+      TastyMacroImpl.info.decls enter unpickledMacroImplMeth
+      // field
+      val unpickledMacroImplField = TastyMacroImpl.newValue(nme.unpickledMacroImpl, newFlags = PRIVATE | LOCAL | PARAMACCESSOR)
+      unpickledMacroImplField.setInfo(AnyTpe).markAllCompleted()
+      TastyMacroImpl.info.decls enter unpickledMacroImplField
+      // ctor
+      val ctor = TastyMacroImpl.newConstructor(NoPosition)
+      val param = ctor.newValueParameter(nme.unpickledMacroImpl).setInfo(AnyTpe)
+      ctor.setInfo(MethodType(param :: Nil, TastyMacroImpl.tpe)).markAllCompleted()
+      TastyMacroImpl.info.decls enter ctor
+      TastyMacroImpl.addAnnotation(
+        sym = CompileTimeOnlyAttr,
+        arg = Literal(Constant("TastyMacroImpl is an implementation detail of unpickling TASTy"))
+      )
+      TastyMacroImpl.markAllCompleted()
+    }
 
     lazy val StringContextClass           = requiredClass[scala.StringContext]
     lazy val StringContextModule          = requiredModule[scala.StringContext.type]

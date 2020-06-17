@@ -35,6 +35,13 @@ trait SymbolOps { self: TastyUniverse =>
     if (sym.isModuleClass) sym.sourceModule else sym
 
   implicit class SymbolDecorator(val sym: Symbol) {
+
+    def inCompletion: Boolean = sym.rawInfo.isInstanceOf[TastyLazyType]
+
+    /** A computed property that should only be called on a symbol which is known to be in a state of completion
+     *  @see method [[inCompletion]]
+     *  @todo adapt callsites and type so that this property is more safe to call (barring mutation from uncontrolled code)
+     */
     def completer: TastyLazyType = {
       assert(sym.rawInfo.isInstanceOf[TastyLazyType], s"Expected TastyLazyType, is ${u.showRaw(sym.rawInfo)} ")
       sym.rawInfo.asInstanceOf[TastyLazyType]
@@ -100,7 +107,7 @@ trait SymbolOps { self: TastyUniverse =>
   }
 
   private def hasType(member: Symbol)(implicit ctx: Context) = {
-    ctx.mode.is(ReadAnnotation) || (member.rawInfo `ne` u.NoType)
+    ctx.mode.is(ReadAnnotation) || ctx.mode.is(ReadMacro) && (member.info `ne` u.NoType) || (member.rawInfo `ne` u.NoType)
   }
 
   private def errorMissing[T](space: Type, tname: TastyName)(implicit ctx: Context) = {

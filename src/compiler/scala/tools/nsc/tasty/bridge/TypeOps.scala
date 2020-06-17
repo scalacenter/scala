@@ -74,6 +74,15 @@ trait TypeOps { self: TastyUniverse =>
     final val RepeatedAnnot: Symbol = u.definitions.RepeatedAnnotationClass
 
     final val NoType: Type = u.NoType
+
+    object UninitializedCompleter extends TastyLazyType(EmptyTastyFlags) {
+      /** completing an uninitialized symbol is a cyclic reference, its definition has not yet been seen. */
+      override def complete(sym: symbolTable.Symbol): Unit = {
+        sym.info = u.ErrorType
+        throw u.CyclicReference(sym, this)
+      }
+    }
+
     def ByNameType(arg: Type): Type = u.definitions.byNameType(arg)
     def TypeBounds(lo: Type, hi: Type): Type = u.TypeBounds.apply(lo, hi)
     def SingleType(pre: Type, sym: Symbol): Type = u.singleType(pre, sym)
