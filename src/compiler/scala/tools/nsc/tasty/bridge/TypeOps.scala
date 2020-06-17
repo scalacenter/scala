@@ -314,10 +314,7 @@ trait TypeOps { self: TastyUniverse =>
     namedMemberOfTypeWithPrefix(pre, pre, name)
 
   def namedMemberOfTypeWithPrefix(pre: Type, space: Type, tname: TastyName)(implicit ctx: Context): Type = {
-    val sym = namedMemberOfType(space, tname)
-    val tpe = prefixedRef(pre, sym)
-    if (pre != space && !tname.isTypeName) tpe.asSeenFrom(pre, sym.owner)
-    else tpe
+    prefixedRef(pre, namedMemberOfType(space, tname))
   }
 
   def lambdaResultType(resType: Type): Type = resType match {

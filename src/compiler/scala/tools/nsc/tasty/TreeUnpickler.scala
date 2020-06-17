@@ -780,7 +780,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               if (nothingButMods(end) && sym.not(ParamSetter)) tpt.tpe
               else defn.ExprType(tpt.tpe))
         }
-        ctx.log(s"$symAddr typeOf(${showSym(sym)}) =:= ${if (sym.isType) sym.tpe else sym.info}; owned by ${location(sym.owner)}")
+        ctx.log(s"$symAddr @@@ ${showSym(sym)}.tpe =:= '[${if (sym.isType) sym.tpe else sym.info}]; owned by ${location(sym.owner)}")
         goto(end)
         NoCycle(at = symAddr)
       } catch ctx.onCompletionError(sym)
@@ -900,10 +900,9 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       def completeSelectType(name: TastyName.TypeName)(implicit ctx: Context): Tree = completeSelect(name)
 
       def completeSelect(name: TastyName)(implicit ctx: Context): Tree = {
-        val localCtx = ctx.selectionCtx(name)
-        val qual     = readTerm()(localCtx)
+        val qual     = readTerm()
         val qualType = qual.tpe // TODO [tasty]: qual.tpe.widenIfUnstable
-        tpd.Select(qual, name)(namedMemberOfPrefix(qualType, name)(localCtx))
+        tpd.Select(qual, name)(namedMemberOfPrefix(qualType, name))
       }
 
       def completeSelectionParent(name: TastyName)(implicit ctx: Context): Tree = {
@@ -935,21 +934,18 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         val result =
           (tag: @switch) match {
             case SELECTin =>
-              if (inParentCtor) unsupportedTermTreeError("selection with a prefix in a parent")
-              else unsupportedTermTreeError("selection with a prefix")
-              // val sname = readTastyName()
-              // val qual  = readTerm()
-              // val owner = readType()
-              // def select(name: TastyName, denot: Symbol) = {
-              //   val prefix = ctx.typeAssigner.maybeSkolemizePrefix(qual.tpe.widenIfUnstable, name)
-              //   makeSelect(qual, name, denot.asSeenFrom(prefix))
-              // }
-              // sname match {
-              //   case TastyName.SignedName(name, sig) =>
-              //     select(name, owner.decl(name).atSignature(sig))
-              //   case name =>
-              //     select(name, owner.decl(name))
-              // }
+              val sname = readTastyName()
+              val qual  = readTerm()
+              if (inParentCtor) {
+                assert(sname.isSignedConstructor, s"Parent of ${ctx.owner} is not a constructor.")
+                skipTree()
+                qual
+              }
+              else {
+                val owner   = readType()
+                val qualTpe = qual.tpe // qual.tpe.widenIfUnstable
+                tpd.Select(qual, sname)(namedMemberOfTypeWithPrefix(qualTpe, owner, sname))
+              }
             case SUPER =>
               val qual = readTerm()
               val (mixId, mixTpe) = ifBefore(end)(readQualId(), (untpd.EmptyTypeIdent, defn.NoType))

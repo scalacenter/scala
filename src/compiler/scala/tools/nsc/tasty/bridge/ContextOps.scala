@@ -344,7 +344,6 @@ trait ContextOps { self: TastyUniverse =>
     final def withNewScope: Context =
       fresh(newLocalDummy)
 
-    final def selectionCtx(name: TastyName): Context = this // if (name.isConstructorName) this.addMode(Mode.InSuperCall) else this
     final def fresh(owner: Symbol): FreshContext = new FreshContext(owner, this, this.mode)
 
     private def sibling(mode: TastyMode): FreshContext = new FreshContext(this.owner, outerOrThis, mode)
