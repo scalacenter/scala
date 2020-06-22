@@ -6055,7 +6055,6 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         val result =
           if (tree1.isEmpty) tree1
           else {
-            // reporter.echo(s"adapt $tree1 to $ptPlugins")
             val result = adapt(tree1, mode, ptPlugins, tree)
             if (typerShouldExpandDeferredMacros) {
               macroExpandAll(this, result)
