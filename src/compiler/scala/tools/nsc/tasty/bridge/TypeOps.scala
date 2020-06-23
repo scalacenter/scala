@@ -48,7 +48,13 @@ trait TypeOps { self: TastyUniverse =>
 
   def emptyTypeBounds: Type = u.TypeBounds.empty
 
+  def intersectionParts(tpe: Type): List[Type] = tpe match {
+    case tpe: u.RefinedType => tpe.parents
+    case tpe                => tpe :: Nil
+  }
+
   object defn {
+
     final val NoType: Type = u.NoType
     def ByNameType(arg: Type): Type = u.definitions.byNameType(arg)
     def TypeBounds(lo: Type, hi: Type): Type = u.TypeBounds.apply(lo, hi)
@@ -56,6 +62,7 @@ trait TypeOps { self: TastyUniverse =>
     def ExprType(res: Type): Type = u.NullaryMethodType(res)
     def PolyType(params: List[Symbol], res: Type): Type = u.PolyType(params, res)
     def ClassInfoType(parents: List[Type], clazz: Symbol): Type = u.ClassInfoType(parents, clazz.rawInfo.decls, clazz.asType)
+    def ClassInfoType(parents: List[Type], decls: List[Symbol], clazz: Symbol): Type = u.ClassInfoType(parents, u.newScopeWith(decls:_*), clazz.asType)
     def ThisType(sym: Symbol): Type = u.ThisType(sym)
     def ConstantType(c: Constant): Type = u.ConstantType(c)
     def IntersectionType(tps: Type*): Type = u.intersectionType(tps.toList)
@@ -191,8 +198,9 @@ trait TypeOps { self: TastyUniverse =>
   /**
    * Ported from dotc
    */
-  abstract class TastyLazyType(val tastyFlagSet: TastyFlagSet = EmptyTastyFlags) extends u.LazyType with u.FlagAgnosticCompleter {
+  abstract class TastyLazyType(val originalFlagSet: TastyFlagSet) extends u.LazyType with u.FlagAgnosticCompleter {
     private[this] var myDecls: u.Scope = u.EmptyScope
+    def tastyOnlyFlags: TastyFlagSet = originalFlagSet & FlagSets.TastyOnlyFlags
     override def decls: u.Scope = myDecls
     private[bridge] def withDecls(decls: u.Scope): this.type = { myDecls = decls; this }
     override def load(sym: Symbol): Unit = complete(sym)
@@ -208,11 +216,6 @@ trait TypeOps { self: TastyUniverse =>
     }
     else if (sym.isConstructor) {
       normaliseConstructorRef(sym)
-    }
-    else if (sym.is(Static)) {
-      // With this constraint, we avoid making singleton types for
-      //  static forwarders to modules (or you get a stack overflow trying to get sealedDescendents in patmat)
-      sym.preciseRef(prefix)
     }
     else {
       u.singleType(prefix, sym)
