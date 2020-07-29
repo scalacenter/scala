@@ -415,7 +415,12 @@ class TreeUnpickler[Tasty <: TastyUniverse](
     private def nothingButMods(end: Addr): Boolean =
       currentAddr === end || isModifierTag(nextByte)
 
-    private def normalizeFlags(tag: Int, owner: Symbol, tastyFlags: TastyFlagSet, name: TastyName, isAbsType: Boolean, isClass: Boolean, rhsIsEmpty: Boolean)(implicit ctx: Context): TastyFlagSet = {
+    private def normalizeName(isType: Boolean, name: TastyName)(implicit ctx: Context): TastyName = {
+      val prior = if (ctx.owner.isTrait && name === TastyName.Constructor) TastyName.MixinConstructor else name
+      if (isType) prior.toTypeName else prior
+    }
+
+    private def normalizeFlags(tag: Int, tastyFlags: TastyFlagSet, name: TastyName, isAbsType: Boolean, isClass: Boolean, rhsIsEmpty: Boolean)(implicit ctx: Context): TastyFlagSet = {
       var flags = tastyFlags
       val lacksDefinition =
         rhsIsEmpty &&
@@ -426,7 +431,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       if (isClass && flags.is(Trait)) flags |= Abstract
       if (tag === DEFDEF) flags |= Method
       if (tag === VALDEF) {
-        if (flags.is(Inline) || owner.is(Trait)) flags |= FieldAccessor
+        if (flags.is(Inline) || ctx.owner.is(Trait)) flags |= FieldAccessor
         if (flags.not(Mutable)) flags |= Stable
         if (flags.is(SingletonEnumFlags)) flags |= Object // we will encode dotty enum constants as objects (this needs to be corrected in bytecode)
       }
@@ -477,9 +482,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       val tag = readByte()
       def isTypeTag = tag === TYPEDEF || tag === TYPEPARAM
       val end = readEnd()
-      var name: TastyName = readTastyName()
-      if (isTypeTag) name = name.toTypeName
-      ctx.log(s"$start ::: => create ${astTagToString(tag)} ${name.debug}")
+      val parsedName: TastyName = readTastyName()
+      ctx.log(s"$start ::: => create ${astTagToString(tag)} ${parsedName.debug}")
       skipParams()
       val ttag = nextUnsharedTag
       val isAbsType = isAbstractType(ttag)
@@ -488,11 +492,12 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       skipTree() // tpt
       val rhsIsEmpty = nothingButMods(end)
       if (!rhsIsEmpty) skipTree()
-      val (flags, annotations, privateWithin) = {
+      val (name, flags, annotations, privateWithin) = {
         val (parsedFlags, annotations, privateWithin) =
           readModifiers(end, readTypedAnnot, readTypedWithin, noSymbol)
-        val flags = normalizeFlags(tag, ctx.owner, parsedFlags, name, isAbsType, isClass, rhsIsEmpty)
-        (flags, annotations, privateWithin)
+        val name = normalizeName(isTypeTag, parsedName)
+        val flags = normalizeFlags(tag, parsedFlags, name, isAbsType, isClass, rhsIsEmpty)
+        (name, flags, annotations, privateWithin)
       }
       def isTypeParameter = flags.is(Param) && isTypeTag
       def canEnterInClass = !isTypeParameter
@@ -508,7 +513,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         s"""$start parsed flags $debugFlags"""
       }
       val sym = {
-        if (tag === TYPEPARAM && ctx.owner.isClassConstructor) {
+        if (tag === TYPEPARAM && ctx.owner.isConstructor) {
           ctx.findOuterClassTypeParameter(name.toTypeName)
         }
         else {
@@ -725,7 +730,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             unsupportedWhen(tastyOnlyFlags.is(Inline), s"${if (sym.is(Macro)) "" else "inline "}$sym")
             val isMacroDef = tastyOnlyFlags.is(Erased) && sym.is(Macro)
             unsupportedWhen(tastyOnlyFlags.is(Erased) && !isMacroDef, s"erased $sym")
-            val isCtor = sym.isClassConstructor
+            val isCtor = sym.isConstructor
             val typeParams = {
               if (isCtor) {
                 skipTypeParams()
@@ -745,12 +750,9 @@ class TreeUnpickler[Tasty <: TastyUniverse](
             val resType = effectiveResultType(sym, typeParams, tpt.tpe)
             ctx.setInfo(sym, defn.DefDefType(if (isCtor) Nil else typeParams, valueParamss, resType))
           case VALDEF => // valdef in TASTy is either a singleton object or a method forwarder to a local value.
-            val isInline = repr.tastyOnlyFlags.is(Inline)
             val unsupported = repr.tastyOnlyFlags &~ (Inline | Enum | Extension | Exported)
             unsupportedWhen(unsupported.hasFlags, s"flags on $sym: ${showTasty(unsupported)}")
             val tpe = readTpt()(localCtx).tpe
-            val isConstant = isConstantType(tpe)
-            if (isInline) unsupportedWhen(!isConstant, s"inline val ${sym.nameString} with non-constant type $tpe")
             ctx.setInfo(sym,
               if (repr.originalFlagSet.is(SingletonEnumFlags)) {
                 val enumClass = sym.objectImplementation
@@ -765,7 +767,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
                 ctx.setInfo(enumClass, defn.ClassInfoType(intersectionParts(tpe), ctor :: Nil, enumClass))
                 prefixedRef(sym.owner.thisPrefix, enumClass)
               }
-              else if (isInline && isConstant) defn.InlineExprType(tpe)
+              else if (sym.isFinal && isConstantType(tpe)) defn.InlineExprType(tpe)
               else if (sym.isMethod) defn.ExprType(tpe)
               else tpe
             )
