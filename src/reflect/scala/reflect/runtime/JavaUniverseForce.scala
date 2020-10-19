@@ -429,6 +429,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.uncheckedVarianceClass
     definitions.ChildAnnotationClass
     definitions.RepeatedAnnotationClass
+    definitions.PolyFunctionClass
     definitions.BeanPropertyAttr
     definitions.BooleanBeanPropertyAttr
     definitions.CompileTimeOnlyAttr
