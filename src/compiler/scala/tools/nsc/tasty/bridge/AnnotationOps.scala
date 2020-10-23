@@ -23,7 +23,7 @@ trait AnnotationOps { self: TastyUniverse =>
       u.AnnotationInfo(tpt.tpe, args, Nil)
     case u.Apply(u.TypeApply(u.Select(u.New(tpt), u.nme.CONSTRUCTOR), tpargs), args) =>
       u.AnnotationInfo(u.appliedType(tpt.tpe, tpargs.map(_.tpe)), args, Nil)
-    case u.New(tpt) =>
+    case u.New(tpt) => // special encoding for $values array on an enum
       u.AnnotationInfo(tpt.tpe, Nil, Nil)
     case _ =>
       throw new Exception(s"unexpected annotation kind from TASTy: ${u.showRaw(tree)} in TASTy file ${ctx.source}")
