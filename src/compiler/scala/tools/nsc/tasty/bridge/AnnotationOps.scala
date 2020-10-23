@@ -18,13 +18,15 @@ import scala.tools.nsc.tasty.TastyUniverse
 trait AnnotationOps { self: TastyUniverse =>
   import self.{symbolTable => u}
 
-  private[bridge] final def mkAnnotation(tree: Tree): u.Annotation = tree match {
+  private[bridge] final def mkAnnotation(tree: Tree)(implicit ctx: Context): u.Annotation = tree match {
     case u.Apply(u.Select(u.New(tpt), u.nme.CONSTRUCTOR), args) =>
       u.AnnotationInfo(tpt.tpe, args, Nil)
     case u.Apply(u.TypeApply(u.Select(u.New(tpt), u.nme.CONSTRUCTOR), tpargs), args) =>
       u.AnnotationInfo(u.appliedType(tpt.tpe, tpargs.map(_.tpe)), args, Nil)
+    case u.New(tpt) =>
+      u.AnnotationInfo(tpt.tpe, Nil, Nil)
     case _ =>
-      throw new Exception(s"unexpected annotation kind from TASTy: ${u.showRaw(tree)}")
+      throw new Exception(s"unexpected annotation kind from TASTy: ${u.showRaw(tree)} in TASTy file ${ctx.source}")
   }
 
   abstract class DeferredAnnotation {
