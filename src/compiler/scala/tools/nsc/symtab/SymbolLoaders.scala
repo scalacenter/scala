@@ -245,6 +245,7 @@ abstract class SymbolLoaders {
         try {
           informingProgress("loaded " + description) {
             val currentphase = phase
+            reporter.echo(s"<<< doComplete { ${getClass} } [${root}]")
             try doComplete(root)
             finally phase = currentphase
           }
@@ -257,6 +258,7 @@ abstract class SymbolLoaders {
             ok = false
             signalError(root, ex)
         }
+        reporter.echo(s"<<< SymbolLoader.complete [${root}, ${root.companionSymbol}]")
         initRoot(root)
         if (!root.isPackageClass) initRoot(root.companionSymbol)
       } finally {
@@ -273,8 +275,10 @@ abstract class SymbolLoaders {
         sym setInfo tpe
     }
     private def initRoot(root: Symbol): Unit = {
-      if (root.rawInfo == this)
+      if (root.rawInfo == this) {
+        reporter.echo(s"marking absent ${root}, ${root.moduleClass}, where root state is ${root.rawInfo.getClass}")
         List(root, root.moduleClass) foreach markAbsent
+      }
       else if (root.isClass && !root.isModuleClass)
         root.rawInfo.load(root)
     }

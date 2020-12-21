@@ -1500,6 +1500,8 @@ trait Types
     if (period != currentPeriod) {
       tpe.underlyingPeriod = currentPeriod
       if (!isValid(period)) {
+        if (tpe.sym.name.startsWith("Show"))
+          reporter.echo(s"defineUnderlyingOfSingleType($tpe) [${tpe.pre}]")
         // [Eugene to Paul] needs review
         tpe.underlyingCache = if (tpe.sym == NoSymbol) ThisType(rootMirror.RootClass) else tpe.pre.memberType(tpe.sym).resultType
         assert(tpe.underlyingCache ne tpe, tpe)

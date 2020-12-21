@@ -702,7 +702,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       val sym       = symAtAddr(symAddr)
       val repr      = sym.repr
 
-      ctx.log(s"$symAddr completing ${showSym(sym)} in scope ${showSym(ctx.owner)}")
+      ctx.log(s"$symAddr completing ${showSym(sym)} in scope ${showSym(ctx.owner)}:\n${Thread.currentThread().getStackTrace().mkString("  \n","  \n","\n")}")
 
       def readParamss(implicit ctx: Context): List[List[NoCycle/*ValDef*/]] = nextByte match {
         case PARAM | PARAMEND =>

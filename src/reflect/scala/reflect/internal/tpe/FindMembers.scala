@@ -30,6 +30,11 @@ trait FindMembers {
     protected var initBaseClasses: List[Symbol] = _
 
     protected def init(tpe: Type, name: Name, excludedFlags: Long, requiredFlags: Long): Unit = {
+      tpe match {
+        case tp: SingleType if tp.sym.name.startsWith("Show") =>
+          reporter.echo(s"FindMembers.init($tpe)")
+        case _ =>
+      }
       this.tpe = tpe
       this.name = name
       this.excludedFlags = excludedFlags

@@ -103,18 +103,22 @@ trait SymbolOps { self: TastyUniverse =>
       termParamss
 
   def namedMemberOfType(space: Type, tname: TastyName)(implicit ctx: Context): Symbol = {
-    deepComplete(space)
-    tname match {
+    // deepComplete(space)
+    ctx.log(s"<<< namedMemberOfType($space, ${tname.debug})")
+    val res = tname match {
       case SignedName(qual, sig, target) => signedMemberOfSpace(space, qual, sig.map(_.encode), target)
       case _                             => memberOfSpace(space, tname)
     }
+    ctx.log(s">>> namedMemberOfType($space, ${tname.debug}) = $res")
+    res
   }
 
   private def memberOfSpace(space: Type, tname: TastyName)(implicit ctx: Context): Symbol = {
     // TODO [tasty]: dotty uses accessibleDenot which asserts that `fetched.isAccessibleFrom(pre)`,
     //    or else filters for non private.
     // There should be an investigation to see what code makes that false, and what is an equivalent check.
-    val member = {
+    ctx.log(s"<<< memberOfSpace($space, ${tname.debug})")
+    val res = {val member = {
       if (tname.isTypeName) {
         val asTerm = tname.toTermName
         if (asTerm.isObjectName) space.member(encodeTermName(asTerm)).moduleClass
@@ -122,6 +126,15 @@ trait SymbolOps { self: TastyUniverse =>
           val selector = encodeTastyName(tname)
           def lookInTypeCtor =
             space.typeConstructor.typeParams.filter(selector === _.name).headOption.getOrElse(noSymbol)
+          ctx.log {
+            val debugged = space match {
+              case space: u.SingleType =>
+                showSym(space.sym)
+              case _ => ""
+            }
+            // <..> memberOfSpace(fplib#Show.type, Api[Type])
+            s"<..> memberOfSpace($space, ${tname.debug}) [$debugged]"
+          }
           space.member(selector).orElse(lookInTypeCtor)
         }
       }
@@ -129,6 +142,9 @@ trait SymbolOps { self: TastyUniverse =>
     }
     if (isSymbol(member) && hasType(member)) member
     else errorMissing(space, tname)
+    }
+    ctx.log(s">>> memberOfSpace($space, ${tname.debug}) = $res")
+    res
   }
 
   private def hasType(member: Symbol)(implicit ctx: Context) = {
