@@ -17,7 +17,6 @@ import scala.tools.nsc.tasty.SafeEq
 import scala.tools.nsc.tasty.{TastyUniverse, TastyModes}, TastyModes._
 import scala.tools.tasty.{TastyName, Signature, TastyFlags}, TastyName.SignedName, Signature.MethodSignature, TastyFlags._
 import scala.tools.tasty.ErasedTypeRef
-import scala.util.chaining._
 
 /**This layer deals with selecting a member symbol from a type using a `TastyName`,
  * also contains factories for making type references to symbols.
@@ -35,13 +34,13 @@ trait SymbolOps { self: TastyUniverse =>
   final def declaringSymbolOf(sym: Symbol): Symbol =
     if (sym.isModuleClass) sym.sourceModule else sym
 
-  private final def deepComplete(tpe: Type): Unit = {
+  private[bridge] final def deepComplete(tpe: Type, isSpace: Boolean = false, isChild: Boolean = false, isDeep: Boolean = false)(implicit ctx: Context): Unit = {
     val asTerm = tpe.termSymbol
     if (asTerm ne u.NoSymbol) {
-      asTerm.ensureCompleted()
-      deepComplete(tpe.widen)
+      asTerm.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
+      deepComplete(tpe.widen, isSpace, isChild, isDeep = true)
     } else {
-      tpe.typeSymbol.ensureCompleted()
+      tpe.typeSymbol.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
     }
   }
 
@@ -69,10 +68,52 @@ trait SymbolOps { self: TastyUniverse =>
       }
     }
 
-    def ensureCompleted(): Unit = {
-      sym.info
-      sym.annotations.foreach(_.completeInfo())
+    def ensureCompleted(
+      isAnnotCtor: Boolean = false,
+      isDeep: Boolean = false,
+      isCompleteOwner: Boolean = false,
+      isOverload: Boolean = false,
+      isCopy: Boolean = false,
+      isSpace: Boolean = false,
+      isChild: Boolean = false,
+    )(implicit ctx: Context): Unit = {
+      val raw = sym.rawInfo
+      if (raw.isInstanceOf[u.LazyType]) {
+        ctx.trace(traceForceInfo(sym, isAnnotCtor, isDeep, isCompleteOwner, isOverload, isCopy, isSpace, isChild)) {
+          sym.info
+          sym.annotations.foreach(_.completeInfo())
+        }
+      } else {
+        assert(!raw.isInstanceOf[TastyRepr], s"${showSym(sym)} has incorrectly initialised info $raw")
+      }
     }
+
+    private def traceForceInfo(
+      sym: Symbol,
+      isAnnotCtor: Boolean,
+      isDeep: Boolean,
+      isCompleteOwner: Boolean,
+      isOverload: Boolean,
+      isCopy: Boolean,
+      isSpace: Boolean,
+      isChild: Boolean
+    )(implicit ctx: Context) = TraceInfo[Unit](
+      query = "force symbol info",
+      qual = s"${showSym(sym)} in context ${showSym(ctx.owner)}",
+      res = _ => s"${showSym(sym)} was forced",
+      modifiers = {
+        var mods = List.empty[String]
+        if (isAnnotCtor) mods ::= "reading annotation constructor"
+        if (isDeep) mods ::= "deep"
+        if (isCompleteOwner) mods ::= "class owner is required"
+        if (isOverload) mods ::= "overload resolution"
+        if (isCopy) mods ::= "copying its info"
+        if (isSpace) mods ::= "space"
+        if (isChild) mods ::= "forcing sealed child"
+        mods
+      }
+    )
+
     def objectImplementation: Symbol = sym.moduleClass
     def sourceObject: Symbol = sym.sourceModule
     def ref(args: List[Type]): Type = u.appliedType(sym, args)
@@ -92,7 +133,7 @@ trait SymbolOps { self: TastyUniverse =>
       termParamss
 
   def namedMemberOfType(space: Type, tname: TastyName)(implicit ctx: Context): Symbol = {
-    deepComplete(space)
+    deepComplete(space, isSpace = true)
     tname match {
       case SignedName(qual, sig, target) => signedMemberOfSpace(space, qual, sig.map(_.encode), target)
       case _                             => memberOfSpace(space, tname)
@@ -156,44 +197,52 @@ trait SymbolOps { self: TastyUniverse =>
       unsupportedError(s"selection of method $qual with @targetName(" + '"' + target + '"' + ")")
     }
     else {
-      ctx.log(s"""<<< looking for overload in symbolOf[$space] @@ $qual: ${showSig(sig)}""")
-      val member = space.member(encodeTermName(qual))
-      if (!(isSymbol(member) && hasType(member))) errorMissing(space, qual)
-      val (tyParamCount, paramRefs) = {
-        val (tyParamCounts, params) = sig.params.partitionMap(identity)
-        if (tyParamCounts.length > 1) {
-          unsupportedError(s"method with unmergeable type parameters: $qual")
+      ctx.trace(traceOverload(space, qual, sig)) {
+        val member = space.member(encodeTermName(qual))
+        if (!(isSymbol(member) && hasType(member))) errorMissing(space, qual)
+        val (tyParamCount, paramRefs) = {
+          val (tyParamCounts, params) = sig.params.partitionMap(identity)
+          if (tyParamCounts.length > 1) {
+            unsupportedError(s"method with unmergeable type parameters: $qual")
+          }
+          (tyParamCounts.headOption.getOrElse(0), params)
         }
-        (tyParamCounts.headOption.getOrElse(0), params)
+        def compareSym(sym: Symbol): Boolean = sym match {
+          case sym: u.MethodSymbol =>
+            sym.ensureCompleted(isOverload = true)
+            // TODO [tasty]: we should cache signatures for symbols and compare against `sig`
+            val meth0 = u.unwrapWrapperTypes(sym.tpe.asSeenFrom(space, sym.owner))
+            val paramSyms = meth0.paramss.flatten
+            val resTpe = meth0.finalResultType
+            val sameParamSize = paramSyms.length === paramRefs.length
+            def sameTyParamSize = tyParamCount === ({
+              // the signature of a class/mixin constructor includes
+              // type parameters, in nsc these come from the parent.
+              val tyParamOwner = if (qual.isConstructorName) member.owner else sym
+              tyParamOwner.typeParams.length
+            })
+            def sameParams = paramSyms.lazyZip(paramRefs).forall({
+              case (paramSym, paramRef) => sameErasure(sym)(paramSym.tpe, paramRef)
+            })
+            sameParamSize && sameTyParamSize && sameParams && sameErasure(sym)(resTpe, sig.result)
+          case _ =>
+            ctx.log(s"""! member[$space]("$qual") ${showSym(sym)} is not a method""")
+            false
+        }
+        member.asTerm.alternatives.find(compareSym).getOrElse(
+          typeError(s"No matching overload of $space.$qual with signature ${showSig(sig)}")
+        )
       }
-      def compareSym(sym: Symbol): Boolean = sym match {
-        case sym: u.MethodSymbol =>
-          val meth0 = u.unwrapWrapperTypes(sym.tpe.asSeenFrom(space, sym.owner))
-          val paramSyms = meth0.paramss.flatten
-          val resTpe = meth0.finalResultType
-          val sameParamSize = paramSyms.length === paramRefs.length
-          def sameTyParamSize = tyParamCount === ({
-            // the signature of a class/mixin constructor includes
-            // type parameters, in nsc these come from the parent.
-            val tyParamOwner = if (qual.isConstructorName) member.owner else sym
-            tyParamOwner.typeParams.length
-          })
-          def sameParams = paramSyms.lazyZip(paramRefs).forall({
-            case (paramSym, paramRef) => sameErasure(sym)(paramSym.tpe, paramRef)
-          })
-          sameParamSize && sameTyParamSize && sameParams && sameErasure(sym)(resTpe, sig.result)
-        case _ =>
-          ctx.log(s"""! member[$space]("$qual") ${showSym(sym)} is not a method""")
-          false
-      }
-      member.asTerm.alternatives.find(compareSym).getOrElse(
-        typeError(s"No matching overload of $space.$qual with signature ${showSig(sig)}")
-      ).tap(overload =>
-        ctx.log(s">>> selected ${showSym(overload)}: ${overload.tpe}")
-      )
     }
   }
 
+  private def traceOverload(space: Type, tname: TastyName, sig: MethodSignature[ErasedTypeRef]) = TraceInfo[Symbol](
+    query = s"looking for overload",
+    qual = s"symbolOf[$space] @@ $tname: ${showSig(sig)}",
+    res = overload => s"selected overload ${showSym(overload)}"
+  )
+
   def showSig(sig: MethodSignature[ErasedTypeRef]): String = sig.map(_.signature).show
-  def showSym(sym: Symbol): String = s"Symbol(${sym.accurateKindString} ${sym.name}, #${sym.id})"
+  def showSym(sym: Symbol): String = s"`(#${sym.id}) ${sym.accurateKindString} ${sym.name}`"
+  def showSymStable(sym: Symbol): String = s"#[${sym.id}, ${sym.name}]"
 }

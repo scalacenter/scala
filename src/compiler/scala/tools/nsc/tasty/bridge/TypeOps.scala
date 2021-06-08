@@ -57,6 +57,9 @@ trait TypeOps { self: TastyUniverse =>
     case tpe                     => tpe.typeSymbolDirect.toString
   }
 
+  def showType(tpe: Type): String = s"${'"'}${showTypeInner(tpe)}${'"'}"
+  def showTypeInner(tpe: Type): String = s"type://$tpe"
+
   def fnResult(fn: Type): Type = fn.dealiasWiden.finalResultType
   def tyconResult(tycon: Type, args: List[Type]): Type = tycon.resultType.substituteTypes(tycon.typeParams, args)
 
@@ -101,7 +104,7 @@ trait TypeOps { self: TastyUniverse =>
       def originalFlagSet: TastyFlagSet = EmptyTastyFlags
     }
 
-    private[bridge] def CopyInfo(underlying: u.TermSymbol, originalFlagSet: TastyFlagSet): TastyRepr =
+    private[bridge] def CopyInfo(underlying: u.TermSymbol, originalFlagSet: TastyFlagSet)(implicit ctx: Context): TastyRepr =
       new CopyCompleter(underlying, originalFlagSet)
 
     def OpaqueTypeToBounds(tpe: Type): (Type, Type) = tpe match {
@@ -204,6 +207,12 @@ trait TypeOps { self: TastyUniverse =>
         typeRefUncurried(tycon, args)
       }
 
+    }
+
+    def adjustParent(tp: Type): Type = {
+      val tpe = tp.dealias
+      if (tpe.typeSymbolDirect === u.definitions.ObjectClass) u.definitions.AnyRefTpe
+      else tpe
     }
   }
 
@@ -415,10 +424,11 @@ trait TypeOps { self: TastyUniverse =>
     def computeInfo(sym: Symbol)(implicit ctx: Context): Unit
   }
 
-  private[TypeOps] class CopyCompleter(underlying: u.TermSymbol, final val originalFlagSet: TastyFlagSet)
-      extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
+  private[TypeOps] class CopyCompleter(underlying: u.TermSymbol, final val originalFlagSet: TastyFlagSet)(implicit
+      capturedCtx: Context
+  ) extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
     override final def complete(sym: Symbol): Unit = {
-      underlying.ensureCompleted()
+      underlying.ensureCompleted(isCopy = true)
       sym.info = underlying.tpe
       underlying.attachments.all.foreach(sym.updateAttachment(_))
     }

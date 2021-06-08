@@ -12,6 +12,8 @@
 
 package scala.tools.nsc.tasty.bridge
 
+import scala.tools.nsc.tasty.{cyan, yellow, magenta, blue, green}
+
 import scala.annotation.tailrec
 import scala.reflect.io.AbstractFile
 
@@ -19,6 +21,8 @@ import scala.tools.tasty.{TastyName, TastyFlags}, TastyFlags._, TastyName.Object
 import scala.tools.nsc.tasty.{TastyUniverse, TastyModes, SafeEq}, TastyModes._
 import scala.reflect.internal.MissingRequirementError
 import scala.collection.mutable
+
+import scala.util.chaining._
 
 /**This contains the definition for `Context`, along with standard error throwing capabilities with user friendly
  * formatted errors that can change their output depending on the context mode.
@@ -114,12 +118,23 @@ trait ContextOps { self: TastyUniverse =>
     for (annot <- sym.annotations) {
       annot.completeInfo()
       if (annot.tpe.typeSymbolDirect === defn.ChildAnnot) {
-        val child = annot.tpe.typeArgs.head.typeSymbolDirect
+        val childTpe = annot.tpe.typeArgs.head
+        val child = ctx.trace(traceSealedChild(sym, childTpe)) {
+          childTpe.typeSymbolDirect
+        }
         sym.addChild(child)
         ctx.log(s"adding sealed child ${showSym(child)} to ${showSym(sym)}")
       }
     }
   }
+
+  final case class TraceInfo[-T](query: String, qual: String, res: T => String, modifiers: List[String] = Nil)
+
+  private def traceSealedChild(sym: Symbol, childTpe: Type) = TraceInfo[Symbol](
+    s"forcing sealed child",
+    s"${showType(childTpe)} of ${showSym(sym)}",
+    child => s"child was ${showSym(child)}"
+  )
 
   /**Maintains state through traversal of a TASTy file, such as the outer scope of the defintion being traversed, the
    * traversal mode, and the root owners and source path for the TASTy file.
@@ -155,11 +170,42 @@ trait ContextOps { self: TastyUniverse =>
     }
 
     final def log(str: => String): Unit = {
-      if (u.settings.YdebugTasty)
-        u.reporter.echo(
-          pos = u.NoPosition,
-          msg = str.linesIterator.map(line => s"#[$classRoot]: $line").mkString(System.lineSeparator)
-        )
+      if (u.settings.YdebugTasty) {
+        logImpl(str)
+      }
+    }
+
+    private final def logImpl(str: => String): Unit = u.reporter.echo(
+      pos = u.NoPosition,
+      msg = str
+              .linesIterator
+              .map(line => s"${blue(s"${showSymStable(classRoot)}:")} $line")
+              .mkString(System.lineSeparator)
+    )
+
+    @inline final def trace[T](info: => TraceInfo[T])(op: => T): T = {
+      if (u.settings.YdebugTasty) {
+        initialContext.trace { stack =>
+          val i = info
+          val id = stack.reverse.mkString("[", " ", ")")
+          val modStr = (
+            if (i.modifiers.isEmpty) ""
+            else " " + green(i.modifiers.mkString("[", ",", "]"))
+          )
+          logImpl(s"${yellow(s"$id")} ${cyan(s"<<< ${i.query}:")} ${magenta(i.qual)}$modStr")
+          op.tap(eval => logImpl(s"${yellow(s"$id")} ${cyan(s">>>")} ${magenta(i.res(eval))}$modStr"))
+        }
+      }
+      else op
+    }
+
+    /** Trace only when `-Vdebug` is set
+     */
+    @inline final def traceV[T](info: => TraceInfo[T])(op: => T): T = {
+      if (u.settings.debug.value) {
+        trace(info)(op)
+      }
+      else op
     }
 
     def owner: Symbol
@@ -381,13 +427,8 @@ trait ContextOps { self: TastyUniverse =>
       cls
     }
 
-    /** Normalises the parents and sets up value class machinery */
-    final def adjustParents(cls: Symbol, parents: List[Type]): List[Type] = {
-      val parentTypes = parents.map { tp =>
-        val tpe = tp.dealias
-        if (tpe.typeSymbolDirect === u.definitions.ObjectClass) u.definitions.AnyRefTpe
-        else tpe
-      }
+    /** sets up value class machinery */
+    final def processParents(cls: Symbol, parentTypes: List[Type]): parentTypes.type = {
       if (parentTypes.head.typeSymbolDirect === u.definitions.AnyValClass) {
         // TODO [tasty]: please reconsider if there is some shared optimised logic that can be triggered instead.
         withPhaseNoLater("extmethods") { ctx0 =>
@@ -510,6 +551,19 @@ trait ContextOps { self: TastyUniverse =>
     def mode: TastyMode = EmptyTastyMode
     def owner: Symbol = topLevelClass.owner
 
+    private[this] var _traceId: Long = -1L
+    private[this] var _trace: List[Long] = Nil
+
+    private[ContextOps] def trace[T](op: List[Long] => T): T = {
+      val oldTrace  = _trace
+      val nextId    = _traceId + 1
+      val nextTrace = nextId :: oldTrace
+      _trace   = nextTrace
+      _traceId = nextId
+      try op(nextTrace)
+      finally _trace = oldTrace
+    }
+
     private[this] var mySymbolsToForceAnnots: mutable.LinkedHashSet[Symbol] = _
 
     private[ContextOps] def stageSymbolToForceAnnots(sym: Symbol): Unit = {
@@ -532,12 +586,19 @@ trait ContextOps { self: TastyUniverse =>
         val toForce = mySymbolsToForceAnnots.toList
         mySymbolsToForceAnnots.clear()
         for (sym <- toForce) {
-          log(s"!!! forcing annotations on ${showSym(sym)}")
-          analyseAnnotations(sym)
+          trace(traceForceAnnotations(sym)) {
+            analyseAnnotations(sym)
+          }
         }
         assert(mySymbolsToForceAnnots.isEmpty, "more symbols added while forcing")
       }
     }
+
+    private def traceForceAnnotations(sym: Symbol) = TraceInfo[Unit](
+      query = "forcing annotations of symbol",
+      qual = s"${showSym(sym)}",
+      res = _ => s"annotations were forced on ${showSym(sym)}"
+    )
 
     private[this] var myInlineDefs: mutable.Map[Symbol, mutable.ArrayBuffer[Symbol]] = null
     private[this] var myMacros: mutable.Map[Symbol, mutable.ArrayBuffer[Symbol]] = null

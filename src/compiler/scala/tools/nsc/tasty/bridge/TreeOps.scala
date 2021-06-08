@@ -35,6 +35,16 @@ trait TreeOps { self: TastyUniverse =>
     }
   }
 
+  def showTree(tree: Tree): String = {
+    val tree1 = tree.transform(new u.Transformer {
+      override def transform(tree: Tree) = tree match {
+        case tree: u.TypeTree => u.Literal(u.Constant(showTypeInner(tree.tpe)))
+        case tree => super.transform(tree)
+      }
+    })
+    u.show(tree1)
+  }
+
   object tpd {
 
     @inline final def Constant(value: Any): Constant =
@@ -59,7 +69,7 @@ trait TreeOps { self: TastyUniverse =>
 
       if (ctx.mode.is(ReadAnnotation) && name.isSignedConstructor) {
         val cls = qual.tpe.typeSymbol
-        cls.ensureCompleted() // need to force flags
+        cls.ensureCompleted(isAnnotCtor = true) // need to force flags
         if (cls.isJavaAnnotation)
           selectCtor(qual)
         else
