@@ -119,22 +119,24 @@ trait ContextOps { self: TastyUniverse =>
       annot.completeInfo()
       if (annot.tpe.typeSymbolDirect === defn.ChildAnnot) {
         val childTpe = annot.tpe.typeArgs.head
-        val child = ctx.trace(traceSealedChild(sym, childTpe)) {
-          childTpe.typeSymbolDirect
+        val child0 = symOfPath(childTpe)
+        assert(isSymbol(child0), s"did not find symbol of sealed child ${showType(childTpe)}")
+        val child = {
+          if (child0.isClass) {
+            child0
+          }
+          else {
+            assert(child0.isModule, s"sealed child was not class or object ${showSym(child0)}")
+            child0.moduleClass
+          }
         }
-        sym.addChild(child)
         ctx.log(s"adding sealed child ${showSym(child)} to ${showSym(sym)}")
+        sym.addChild(child)
       }
     }
   }
 
   final case class TraceInfo[-T](query: String, qual: String, res: T => String, modifiers: List[String] = Nil)
-
-  private def traceSealedChild(sym: Symbol, childTpe: Type) = TraceInfo[Symbol](
-    s"forcing sealed child",
-    s"${showType(childTpe)} of ${showSym(sym)}",
-    child => s"child was ${showSym(child)}"
-  )
 
   /**Maintains state through traversal of a TASTy file, such as the outer scope of the defintion being traversed, the
    * traversal mode, and the root owners and source path for the TASTy file.
@@ -420,10 +422,24 @@ trait ContextOps { self: TastyUniverse =>
 
     final def enterClassCompletion(): Symbol = {
       val cls = globallyVisibleOwner.asClass
-      val assumedSelfType =
-        if (cls.is(Object) && cls.owner.isClass) defn.SingleType(cls.owner.thisType, cls.sourceModule)
-        else u.NoType
-      cls.info = u.ClassInfoType(cls.repr.parents, cls.repr.decls, assumedSelfType.typeSymbolDirect)
+      // val assumedSelfType = {
+      //   if (cls.is(Object) && cls.owner.isClass) {
+      //     cls.sourceModule.ensureCompleted() // todo add modifier
+      //     defn.SingleType(cls.owner.thisType, cls.sourceModule)
+      //   }
+      //   else {
+      //     u.NoType
+      //   }
+      // }
+      val assumedSelfSym = {
+        if (cls.is(Object) && cls.owner.isClass) {
+          cls.sourceModule
+        }
+        else {
+          u.NoSymbol
+        }
+      }
+      cls.info = u.ClassInfoType(cls.repr.parents, cls.repr.decls, assumedSelfSym)//assumedSelfType.typeSymbolDirect)
       cls
     }
 

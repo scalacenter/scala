@@ -18,6 +18,8 @@ import scala.tools.nsc.tasty.{TastyUniverse, TastyModes}, TastyModes._
 import scala.tools.tasty.{TastyName, Signature, TastyFlags}, TastyName.SignedName, Signature.MethodSignature, TastyFlags._
 import scala.tools.tasty.ErasedTypeRef
 
+import scala.annotation.tailrec
+
 /**This layer deals with selecting a member symbol from a type using a `TastyName`,
  * also contains factories for making type references to symbols.
  */
@@ -34,11 +36,29 @@ trait SymbolOps { self: TastyUniverse =>
   final def declaringSymbolOf(sym: Symbol): Symbol =
     if (sym.isModuleClass) sym.sourceModule else sym
 
+  /** Fetch the symbol of a path type without forcing the symbol,
+   * `NoSymbol` if not a path.
+   * @param tpe should be a path type
+   */
+  @tailrec
+  private[bridge] final def symOfPath(tpe: Type): Symbol = tpe match {
+    case tpe: u.TypeRef => tpe.sym
+    case tpe: u.SingleType => tpe.sym
+    case tpe: u.ThisType => tpe.sym
+    case tpe: u.ConstantType => symOfPath(tpe.value.tpe)
+    case _ => u.NoSymbol
+  }
+
   private[bridge] final def deepComplete(tpe: Type, isSpace: Boolean = false, isChild: Boolean = false, isDeep: Boolean = false)(implicit ctx: Context): Unit = {
     val asTerm = tpe.termSymbol
     if (asTerm ne u.NoSymbol) {
-      asTerm.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
-      deepComplete(tpe.widen, isSpace, isChild, isDeep = true)
+      if (asTerm.is(Object)) {
+        asTerm.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
+        asTerm.moduleClass.ensureCompleted(isDeep = true, isSpace = isSpace, isChild = isChild)
+      }
+      else {
+        ctx.log(s"deep complete on non module ${showSym(asTerm)}, not taking action")
+      }
     } else {
       tpe.typeSymbol.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
     }

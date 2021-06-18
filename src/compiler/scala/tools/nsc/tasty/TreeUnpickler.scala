@@ -850,6 +850,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           readTemplate()(localCtx)
         }
         else {
+          sym.info = defn.InitialTypeInfo // needed to avoid cyclic references when unpickling rhs, see dotty_i3816.scala
           checkUnsupportedFlags(repr.tastyOnlyFlags &~ allowedTypeFlags)
           val rhs = readTpt()(if (repr.originalFlagSet.is(Opaque)) localCtx.addMode(OpaqueTypeDef) else localCtx)
           val info =
@@ -872,10 +873,12 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           else defn.ExprType(tpt.tpe))
       }
 
-      def initialize()(implicit ctx: Context): Unit = ctx.trace(traceCompletion(symAddr, sym)) {
+      def initialize(localCtx: Context)(implicit ctx: Context): Unit = ctx.trace(traceCompletion(symAddr, sym)) {
+        def dumpTrace: String =
+          Thread.currentThread().getStackTrace().drop(2).take(100).map(_.toString()).mkString("\n  ", "\n  ", "")
+        ctx.log(s"initialise$dumpTrace")
         sym.rawInfo match {
           case repr: TastyRepr =>
-            val localCtx = ctx.withOwner(sym)
             tag match {
               case DEFDEF              => DefDef(repr, localCtx)
               case VALDEF              => ValDef(repr, localCtx)
@@ -888,7 +891,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       try {
-        initialize()
+        inIndexScopedStatsContext(localCtx => initialize(localCtx)(ctx))(ctx.withOwner(sym))
         NoCycle(at = symAddr)
       }
       catch ctx.onCompletionError(sym)
@@ -991,8 +994,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         setInfoWithParents(tparams, ctx.processParents(cls, parents))
       }
 
-      inIndexScopedStatsContext(traverseTemplate()(_))
-
+      traverseTemplate()
     }
 
     def isTopLevel: Boolean = nextByte === IMPORT || nextByte === PACKAGE
