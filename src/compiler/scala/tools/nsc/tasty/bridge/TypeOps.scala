@@ -52,13 +52,40 @@ trait TypeOps { self: TastyUniverse =>
     }
   }
 
-  def lzyShow(tpe: Type): String = tpe match {
-    case u.TypeRef(_, sym, args) => s"$sym${if (args.nonEmpty) args.map(lzyShow).mkString("[", ",","]") else ""}"
-    case tpe                     => tpe.typeSymbolDirect.toString
+  def lzyShow(tpe: Type): String = {
+    val sym = symOfType(tpe)
+    if (isSymbol(sym)) {
+      val args = tpe.typeArgs
+      s"${sym.fullName}${if (args.nonEmpty) args.map(lzyShow).mkString("[", ",", "]") else ""}"
+    }
+    else {
+      s"${tpe.typeSymbolDirect.fullName}"
+    }
   }
 
-  def showType(tpe: Type): String = s"${'"'}${showTypeInner(tpe)}${'"'}"
-  def showTypeInner(tpe: Type): String = s"type://$tpe"
+  def showType(tpe: Type, wrap: Boolean = true): String = {
+    def prefixed(prefix: String)(op: => String) = {
+      val raw = op
+      if (wrap) s"""$prefix"$raw""""
+      else raw
+    }
+    def parameterised(tparams: List[Symbol], prefix: String)(f: String => String) = prefixed(prefix) {
+      f(if (tparams.isEmpty) "" else tparams.map(p => s"${p.name}").mkString("[", ", ", "]"))
+    }
+    def cls(tparams: List[Symbol], tpe: u.ClassInfoType) = parameterised(tparams, "cls") { paramStr =>
+      s"$paramStr${tpe.typeSymbol.fullName}$paramStr"
+    }
+    def meth(tparams: List[Symbol], tpe: u.MethodType) = parameterised(tparams, "meth") { paramStr =>
+      s"$paramStr$tpe"
+    }
+    tpe match {
+      case tpe: u.ClassInfoType                      => cls(Nil, tpe)
+      case u.PolyType(tparams, tpe: u.ClassInfoType) => cls(tparams, tpe)
+      case u.PolyType(tparams, tpe: u.MethodType)    => meth(tparams, tpe)
+      case tpe: u.MethodType                         => meth(Nil, tpe)
+      case tpe                                       => prefixed("tpe") { s"$tpe" }
+    }
+  }
 
   def fnResult(fn: Type): Type = fn.dealiasWiden.finalResultType
   def tyconResult(tycon: Type, args: List[Type]): Type = tycon.resultType.substituteTypes(tycon.typeParams, args)

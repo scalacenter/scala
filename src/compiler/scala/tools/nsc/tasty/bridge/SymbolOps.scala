@@ -41,11 +41,13 @@ trait SymbolOps { self: TastyUniverse =>
    * @param tpe should be a path type
    */
   @tailrec
-  private[bridge] final def symOfPath(tpe: Type): Symbol = tpe match {
+  private[bridge] final def symOfType(tpe: Type): Symbol = tpe match {
     case tpe: u.TypeRef => tpe.sym
     case tpe: u.SingleType => tpe.sym
     case tpe: u.ThisType => tpe.sym
-    case tpe: u.ConstantType => symOfPath(tpe.value.tpe)
+    case tpe: u.ConstantType => symOfType(tpe.value.tpe)
+    case tpe: u.ClassInfoType => tpe.typeSymbol
+    case tpe: u.RefinedType0 => tpe.typeSymbol
     case _ => u.NoSymbol
   }
 

@@ -874,9 +874,9 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       def initialize(localCtx: Context)(implicit ctx: Context): Unit = ctx.trace(traceCompletion(symAddr, sym)) {
-        def dumpTrace: String =
-          Thread.currentThread().getStackTrace().drop(2).take(100).map(_.toString()).mkString("\n  ", "\n  ", "")
-        ctx.log(s"initialise$dumpTrace")
+        // def dumpTrace: String =
+        //   Thread.currentThread().getStackTrace().drop(2).take(100).map(_.toString()).mkString("\n  ", "\n  ", "")
+        // ctx.log(s"initialise$dumpTrace")
         sym.rawInfo match {
           case repr: TastyRepr =>
             tag match {
@@ -891,7 +891,13 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       try {
-        inIndexScopedStatsContext(localCtx => initialize(localCtx)(ctx))(ctx.withOwner(sym))
+        val localCtx = ctx.withOwner(sym)
+        if (sym.isClass) {
+          inIndexScopedStatsContext(localCtx0 => initialize(localCtx0)(ctx))(localCtx)
+        }
+        else {
+          initialize(localCtx)
+        }
         NoCycle(at = symAddr)
       }
       catch ctx.onCompletionError(sym)
@@ -901,7 +907,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
     private def traceCompletion(addr: Addr, sym: Symbol)(implicit ctx: Context) = TraceInfo[Unit](
       query = "begin completion",
       qual = s"${showSym(sym)} in context ${showSym(ctx.owner)} $addr",
-      res = _ => s"completed ${showSym(sym)}: ${showType(if (sym.isType) sym.tpe else sym.info)}"
+      res = _ => s"completed ${showSym(sym)}: ${showType(sym.info)}"
     )
 
     private def readTemplate()(implicit ctx: Context): Unit = {
@@ -926,7 +932,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         query = "collect template parents",
         qual = s"${showSym(cls)} $currentAddr",
         res = { parentTypes =>
-          val addendum = parentTypes.map(lzyShow).mkString(s"`", " with ", "`")
+          val addendum = parentTypes.map(lzyShow).mkString(s"`${cls.fullName} extends ", " with ", "`")
           s"collected template parents $addendum"
         }
       )

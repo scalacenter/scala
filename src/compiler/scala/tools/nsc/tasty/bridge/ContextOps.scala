@@ -119,7 +119,7 @@ trait ContextOps { self: TastyUniverse =>
       annot.completeInfo()
       if (annot.tpe.typeSymbolDirect === defn.ChildAnnot) {
         val childTpe = annot.tpe.typeArgs.head
-        val child0 = symOfPath(childTpe)
+        val child0 = symOfType(childTpe)
         assert(isSymbol(child0), s"did not find symbol of sealed child ${showType(childTpe)}")
         val child = {
           if (child0.isClass) {
@@ -334,8 +334,10 @@ trait ContextOps { self: TastyUniverse =>
     }
 
     def evict(sym: Symbol): Unit = {
-      sym.owner.rawInfo.decls.unlink(sym)
-      sym.info = u.NoType
+      if (isSymbol(sym)) {
+        sym.owner.rawInfo.decls.unlink(sym)
+        sym.info = u.NoType
+      }
     }
 
     final def enterIfUnseen(sym: Symbol): Unit = {
@@ -655,7 +657,7 @@ trait ContextOps { self: TastyUniverse =>
      * Reports illegal definitions:
      *   - trait constructors with parameters
      *
-     *  @param cls should be a symbol associated with a non-empty scope
+     *  @param cls should be a class symbol associated with a non-empty scope
      */
     private[ContextOps] def enterLatentDefs(cls: Symbol): Unit = {
 
