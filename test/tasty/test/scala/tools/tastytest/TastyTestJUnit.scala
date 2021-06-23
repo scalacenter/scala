@@ -9,14 +9,14 @@ import TastyTestJUnit._
 
 class TastyTestJUnit {
 
-  @test def run(): Unit = TastyTest.runSuite(
-    src                     = "run",
-    srcRoot                 = assertPropIsSet(propSrc),
-    pkgName                 = assertPropIsSet(propPkgName),
-    outDir                  = None,
-    additionalSettings      = Nil,
-    additionalDottySettings = Nil
-  ).eval
+  // @test def run(): Unit = TastyTest.runSuite(
+  //   src                     = "run",
+  //   srcRoot                 = assertPropIsSet(propSrc),
+  //   pkgName                 = assertPropIsSet(propPkgName),
+  //   outDir                  = None,
+  //   additionalSettings      = Nil,
+  //   additionalDottySettings = Nil
+  // ).eval
 
   @test def pos(): Unit = TastyTest.posSuite(
     src                     = "pos",
@@ -27,41 +27,41 @@ class TastyTestJUnit {
     additionalDottySettings = Nil
   ).eval
 
-  @test def posFalseNoAnnotations(): Unit = TastyTest.posSuite(
-    src                     = "pos-false-noannotations",
-    srcRoot                 = assertPropIsSet(propSrc),
-    pkgName                 = assertPropIsSet(propPkgName),
-    outDir                  = None,
-    additionalSettings      = Seq("-Ytasty-no-annotations"),
-    additionalDottySettings = Nil
-  ).eval
+  // @test def posFalseNoAnnotations(): Unit = TastyTest.posSuite(
+  //   src                     = "pos-false-noannotations",
+  //   srcRoot                 = assertPropIsSet(propSrc),
+  //   pkgName                 = assertPropIsSet(propPkgName),
+  //   outDir                  = None,
+  //   additionalSettings      = Seq("-Ytasty-no-annotations"),
+  //   additionalDottySettings = Nil
+  // ).eval
 
-  @test def neg(): Unit = TastyTest.negSuite(
-    src                     = "neg",
-    srcRoot                 = assertPropIsSet(propSrc),
-    pkgName                 = assertPropIsSet(propPkgName),
-    outDir                  = None,
-    additionalSettings      = Nil,
-    additionalDottySettings = Nil
-  ).eval
+  // @test def neg(): Unit = TastyTest.negSuite(
+  //   src                     = "neg",
+  //   srcRoot                 = assertPropIsSet(propSrc),
+  //   pkgName                 = assertPropIsSet(propPkgName),
+  //   outDir                  = None,
+  //   additionalSettings      = Nil,
+  //   additionalDottySettings = Nil
+  // ).eval
 
-  @test def negMoveMacros(): Unit = TastyTest.negChangePreSuite(
-    src                     = "neg-move-macros",
-    srcRoot                 = assertPropIsSet(propSrc),
-    pkgName                 = assertPropIsSet(propPkgName),
-    outDirs                 = None,
-    additionalSettings      = Nil,
-    additionalDottySettings = Nil
-  ).eval
+  // @test def negMoveMacros(): Unit = TastyTest.negChangePreSuite(
+  //   src                     = "neg-move-macros",
+  //   srcRoot                 = assertPropIsSet(propSrc),
+  //   pkgName                 = assertPropIsSet(propPkgName),
+  //   outDirs                 = None,
+  //   additionalSettings      = Nil,
+  //   additionalDottySettings = Nil
+  // ).eval
 
-  @test def negIsolated(): Unit = TastyTest.negSuiteIsolated(
-    src                     = "neg-isolated",
-    srcRoot                 = assertPropIsSet(propSrc),
-    pkgName                 = assertPropIsSet(propPkgName),
-    outDirs                 = None,
-    additionalSettings      = Nil,
-    additionalDottySettings = Nil
-  ).eval
+  // @test def negIsolated(): Unit = TastyTest.negSuiteIsolated(
+  //   src                     = "neg-isolated",
+  //   srcRoot                 = assertPropIsSet(propSrc),
+  //   pkgName                 = assertPropIsSet(propPkgName),
+  //   outDirs                 = None,
+  //   additionalSettings      = Nil,
+  //   additionalDottySettings = Nil
+  // ).eval
 
   val propSrc     = "tastytest.src"
   val propPkgName = "tastytest.packageName"
@@ -91,7 +91,9 @@ object TastyTestJUnit {
 
   final implicit class TryOps(val op: Try[Unit]) extends AnyVal {
     def eval: Unit = op match {
-      case Failure(err) => fail(err.toString)
+      case Failure(err) =>
+        err.printStackTrace()
+        fail(err.toString)
       case _ => ()
     }
   }

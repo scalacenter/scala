@@ -359,7 +359,11 @@ class TreeUnpickler[Tasty <: TastyUniverse](
               readMethodic(companion, id)
             case TYPELAMBDAtype => readMethodic(Function.const(HKTypeLambda), _.toTypeName)
             case PARAMtype => // reference to a type parameter within a LambdaType
-              readTypeRef().typeParams(readNat()).ref
+              val ref = readTypeRef()
+              val idx = readNat()
+              val params = ref.typeParams.ensuring(_ ne null, s"$ref typeParams is null")
+              val param = params(idx)
+              param.ref
           }
         assert(currentAddr === end, s"$start $currentAddr $end ${astTagToString(tag)}")
         result
