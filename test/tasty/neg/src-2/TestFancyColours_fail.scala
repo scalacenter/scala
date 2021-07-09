@@ -8,8 +8,8 @@ object TestFancyColours {
     case Colour.Pink | Colour.Violet => "Amazing!"
   }
 
-  // def describePretty(c: Pretty) = c match { // error: would fail on case Violet
-  //   case Colour.Pink => "Pretty!"
-  // }
+  def describePretty(c: Pretty) = c match { // error: would fail on case Violet
+    case Colour.Pink => "Pretty!"
+  }
 
 }

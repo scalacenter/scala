@@ -874,9 +874,10 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       def initialize(localCtx: Context)(implicit ctx: Context): Unit = ctx.trace(traceCompletion(symAddr, sym)) {
-        // def dumpTrace: String =
-        //   Thread.currentThread().getStackTrace().drop(2).take(100).map(_.toString()).mkString("\n  ", "\n  ", "")
-        // ctx.log(s"initialise$dumpTrace")
+        def dumpTrace: String =
+          Thread.currentThread().getStackTrace().drop(2).take(100).map(_.toString()).mkString("\n  ", "\n  ", "")
+        if (tname.toString == "Red")
+          ctx.log(s"initialise$dumpTrace")
         sym.rawInfo match {
           case repr: TastyRepr =>
             tag match {

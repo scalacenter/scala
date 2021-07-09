@@ -392,7 +392,9 @@ trait ContextOps { self: TastyUniverse =>
       else if (flags.is(FlagSets.Creation.ObjectDef)) {
         log(s"!!! visited module value $name first")
         val module = owner.newModule(encodeTermName(name), u.NoPosition, newSymbolFlagSet(flags))
-        module.moduleClass.info = defn.DefaultInfo
+        module.moduleClass.info =
+          if (flags.is(FlagSets.SingletonEnum)) defn.SingletonEnumClassInfo(module, flags)
+          else defn.DefaultInfo
         module
       }
       else if (name.isTypeName) {

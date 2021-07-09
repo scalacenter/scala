@@ -134,6 +134,9 @@ trait TypeOps { self: TastyUniverse =>
     private[bridge] def CopyInfo(underlying: u.TermSymbol, originalFlagSet: TastyFlagSet)(implicit ctx: Context): TastyRepr =
       new CopyCompleter(underlying, originalFlagSet)
 
+    private[bridge] def SingletonEnumClassInfo(enumValue: u.TermSymbol, originalFlagSet: TastyFlagSet)(implicit ctx: Context): TastyRepr =
+      new EnumCompleter(enumValue, originalFlagSet)
+
     def OpaqueTypeToBounds(tpe: Type): (Type, Type) = tpe match {
       case u.PolyType(tparams, tpe) =>
         val (bounds, alias) = OpaqueTypeToBounds(tpe)
@@ -459,6 +462,14 @@ trait TypeOps { self: TastyUniverse =>
       underlying.ensureCompleted(isCopy = true)
       sym.info = underlying.tpe
       underlying.attachments.all.foreach(sym.updateAttachment(_))
+    }
+  }
+
+  private[TypeOps] class EnumCompleter(enumValue: u.TermSymbol, final val originalFlagSet: TastyFlagSet)(implicit
+      capturedCtx: Context
+  ) extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
+    override final def complete(sym: Symbol): Unit = {
+      enumValue.ensureCompleted(isEnum = true)
     }
   }
 

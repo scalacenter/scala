@@ -98,10 +98,11 @@ trait SymbolOps { self: TastyUniverse =>
       isCopy: Boolean = false,
       isSpace: Boolean = false,
       isChild: Boolean = false,
+      isEnum: Boolean = false,
     )(implicit ctx: Context): Unit = {
       val raw = sym.rawInfo
       if (raw.isInstanceOf[u.LazyType]) {
-        ctx.trace(traceForceInfo(sym, isAnnotCtor, isDeep, isCompleteOwner, isOverload, isCopy, isSpace, isChild)) {
+        ctx.trace(traceForceInfo(sym, isAnnotCtor, isDeep, isCompleteOwner, isOverload, isCopy, isSpace, isChild, isEnum)) {
           sym.info
           sym.annotations.foreach(_.completeInfo())
         }
@@ -118,7 +119,8 @@ trait SymbolOps { self: TastyUniverse =>
       isOverload: Boolean,
       isCopy: Boolean,
       isSpace: Boolean,
-      isChild: Boolean
+      isChild: Boolean,
+      isEnum: Boolean
     )(implicit ctx: Context) = TraceInfo[Unit](
       query = "force symbol info",
       qual = s"${showSym(sym)} in context ${showSym(ctx.owner)}",
@@ -132,6 +134,7 @@ trait SymbolOps { self: TastyUniverse =>
         if (isCopy) mods ::= "copying its info"
         if (isSpace) mods ::= "space"
         if (isChild) mods ::= "forcing sealed child"
+        if (isEnum) mods ::= "forcing enum value from fake object"
         mods
       }
     )
