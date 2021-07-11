@@ -115,19 +115,36 @@ trait ContextOps { self: TastyUniverse =>
    * sealed child.
    */
   private def analyseAnnotations(sym: Symbol)(implicit ctx: Context): Unit = {
+
+    def lookupChild(childTpe: Type): Symbol = {
+      val child = symOfType(childTpe)
+      assert(isSymbol(child), s"did not find symbol of sealed child ${showType(childTpe)}")
+      if (child.isClass) {
+        child
+      }
+      else {
+        assert(child.isModule, s"sealed child was not class or object ${showSym(child)}")
+        child.moduleClass
+      }
+    }
+
     for (annot <- sym.annotations) {
       annot.completeInfo()
       if (annot.tpe.typeSymbolDirect === defn.ChildAnnot) {
-        val childTpe = annot.tpe.typeArgs.head
-        val child0 = symOfType(childTpe)
-        assert(isSymbol(child0), s"did not find symbol of sealed child ${showType(childTpe)}")
         val child = {
-          if (child0.isClass) {
-            child0
+          val child0 = lookupChild(annot.tpe.typeArgs.head)
+          if (child0 eq sym) {
+            // dotty represents a local sealed child of `C` with a child annotation
+            // that directly references `C`, this causes an infinite loop in
+            // `sealedDescendants`. See the tests:
+            // - test/tasty/neg/src-3/dottyi3149/dotty_i3149.scala
+            // - test/tasty/neg/src-2/Testdotty_i3149_fail.scala
+            // TODO [tasty] - fix assumption in compiler that sealed children cannot
+            // contain the parent class
+            ctx.newLocalSealedChildProxy(sym, defn.LocalSealedChildProxyInfo(sym))
           }
           else {
-            assert(child0.isModule, s"sealed child was not class or object ${showSym(child0)}")
-            child0.moduleClass
+            child0
           }
         }
         ctx.log(s"adding sealed child ${showSym(child)} to ${showSym(sym)}")
@@ -253,6 +270,12 @@ trait ContextOps { self: TastyUniverse =>
       info  = info
     )
 
+    final def newLocalSealedChildProxy(cls: Symbol, info: Type): Symbol = cls.primaryConstructor.newClassSymbol(
+      name = u.freshTypeName("$localSealedChildProxy$")(u.currentFreshNameCreator),
+      pos = u.NoPosition,
+      newFlags = FlagSets.Creation.PrivateLocal,
+    ).setInfo(info)
+
     final def findRootSymbol(roots: Set[Symbol], name: TastyName): Option[Symbol] = {
       import TastyName.TypeName
 
@@ -304,11 +327,11 @@ trait ContextOps { self: TastyUniverse =>
     /** Guards the creation of an object val by checking for an existing definition in the owner's scope
       */
     final def delayCompletion(owner: Symbol, name: TastyName, completer: TastyCompleter, privateWithin: Symbol = noSymbol): Symbol = {
-      def default() = unsafeNewSymbol(owner, name, completer.originalFlagSet, completer, privateWithin)
-      if (completer.originalFlagSet.is(Object)) {
+      def default() = unsafeNewSymbol(owner, name, completer.tflags, completer, privateWithin)
+      if (completer.tflags.is(Object)) {
         val sourceObject = findObject(owner, encodeTermName(name))
         if (isSymbol(sourceObject))
-          redefineSymbol(sourceObject, completer.originalFlagSet, completer, privateWithin)
+          redefineSymbol(sourceObject, completer.tflags, completer, privateWithin)
         else
           default()
       }
@@ -317,14 +340,13 @@ trait ContextOps { self: TastyUniverse =>
       }
     }
 
-    /** Guards the creation of an object class by checking for an existing definition in the owner's scope
-      */
+    /** Guards the creation of an object class by checking for an existing definition in the owner's scope */
     final def delayClassCompletion(owner: Symbol, typeName: TastyName.TypeName, completer: TastyCompleter, privateWithin: Symbol): Symbol = {
-      def default() = unsafeNewClassSymbol(owner, typeName, completer.originalFlagSet, completer, privateWithin)
-      if (completer.originalFlagSet.is(Object)) {
+      def default() = unsafeNewClassSymbol(owner, typeName, completer.tflags, completer, privateWithin)
+      if (completer.tflags.is(Object)) {
         val sourceObject = findObject(owner, encodeTermName(typeName.toTermName))
         if (isSymbol(sourceObject))
-          redefineSymbol(sourceObject.objectImplementation, completer.originalFlagSet, completer, privateWithin)
+          redefineSymbol(sourceObject.objectImplementation, completer.tflags, completer, privateWithin)
         else
           default()
       }
@@ -473,7 +495,7 @@ trait ContextOps { self: TastyUniverse =>
       val moduleCls = sym.moduleClass
       val moduleClsFlags = FlagSets.withAccess(
         flags = FlagSets.Creation.ObjectClassDef,
-        inheritedAccess = sym.repr.originalFlagSet
+        inheritedAccess = sym.repr.tflags
       )
       val selfTpe = defn.SingleType(sym.owner.thisPrefix, sym)
       val ctor = newConstructor(moduleCls, selfTpe)

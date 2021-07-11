@@ -103,8 +103,12 @@ class TreeUnpickler[Tasty <: TastyUniverse](
   /** A completer that captures the current position and context, which then uses the position to discover the symbol
    *  to compute the info for.
    */
-  class Completer(isClass: Boolean, reader: TastyReader, originalFlagSet: TastyFlagSet)(implicit ctx: Context)
-  extends TastyCompleter(isClass, originalFlagSet) { self =>
+  class Completer(
+      isClass: Boolean,
+      reader: TastyReader,
+      tflags: TastyFlagSet
+  )(implicit ctx: Context)
+      extends TastyCompleter(isClass, tflags) { self =>
 
     private val symAddr = reader.currentAddr
 
@@ -787,8 +791,8 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       def DefDef(repr: TastyRepr, localCtx: Context)(implicit ctx: Context): Unit = {
-        val isMacro = repr.originalFlagSet.is(Erased | Macro)
-        checkUnsupportedFlags(repr.tastyOnlyFlags &~ (Extension | Exported | Infix | optFlag(isMacro)(Erased)))
+        val isMacro = repr.tflags.is(Erased | Macro)
+        checkUnsupportedFlags(repr.unsupportedFlags &~ (Extension | Exported | Infix | optFlag(isMacro)(Erased)))
         val isCtor = sym.isConstructor
         val paramDefss = readParamss()(localCtx).map(_.map(symFromNoCycle))
         val typeParams = {
@@ -803,7 +807,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
           unsupportedWhen(hasTypeParams, {
             val noun = (
               if (isCtor) "constructor"
-              else if (repr.tastyOnlyFlags.is(Extension)) "extension method"
+              else if (repr.unsupportedFlags.is(Extension)) "extension method"
               else "method"
             )
             s"$noun with unmergeable type parameters: $tname"
@@ -827,10 +831,10 @@ class TreeUnpickler[Tasty <: TastyUniverse](
 
       def ValDef(repr: TastyRepr, localCtx: Context)(implicit ctx: Context): Unit = {
         // valdef in TASTy is either a singleton object or a method forwarder to a local value.
-        checkUnsupportedFlags(repr.tastyOnlyFlags &~ (Enum | Extension | Exported))
+        checkUnsupportedFlags(repr.unsupportedFlags &~ (Enum | Extension | Exported))
         val tpe = readTpt()(localCtx).tpe
         ctx.setInfo(sym,
-          if (repr.originalFlagSet.is(FlagSets.SingletonEnum)) {
+          if (repr.tflags.is(FlagSets.SingletonEnum)) {
             ctx.completeEnumSingleton(sym, tpe)
             prefixedRef(sym.owner.thisPrefix, sym.objectImplementation)
           }
@@ -845,16 +849,16 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         val allowedTypeFlags = allowedShared | Exported
         val allowedClassFlags = allowedShared | Open | Transparent
         if (sym.isClass) {
-          checkUnsupportedFlags(repr.tastyOnlyFlags &~ allowedClassFlags)
+          checkUnsupportedFlags(repr.unsupportedFlags &~ allowedClassFlags)
           sym.owner.ensureCompleted(isCompleteOwner = true)
           readTemplate()(localCtx)
         }
         else {
           sym.info = defn.InitialTypeInfo // needed to avoid cyclic references when unpickling rhs, see dotty_i3816.scala
-          checkUnsupportedFlags(repr.tastyOnlyFlags &~ allowedTypeFlags)
-          val rhs = readTpt()(if (repr.originalFlagSet.is(Opaque)) localCtx.addMode(OpaqueTypeDef) else localCtx)
+          checkUnsupportedFlags(repr.unsupportedFlags &~ allowedTypeFlags)
+          val rhs = readTpt()(if (repr.tflags.is(Opaque)) localCtx.addMode(OpaqueTypeDef) else localCtx)
           val info =
-            if (repr.originalFlagSet.is(Opaque)) {
+            if (repr.tflags.is(Opaque)) {
               val (info, alias) = defn.OpaqueTypeToBounds(rhs.tpe)
               ctx.markAsOpaqueType(sym, alias)
               info
@@ -866,7 +870,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       def TermParam(repr: TastyRepr, localCtx: Context)(implicit ctx: Context): Unit = {
-        checkUnsupportedFlags(repr.tastyOnlyFlags &~ (ParamAlias | Exported))
+        checkUnsupportedFlags(repr.unsupportedFlags &~ (ParamAlias | Exported))
         val tpt = readTpt()(localCtx)
         ctx.setInfo(sym,
           if (nothingButMods(end) && sym.not(ParamSetter)) tpt.tpe

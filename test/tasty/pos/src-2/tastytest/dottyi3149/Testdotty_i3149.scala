@@ -5,7 +5,9 @@ import tastytest._
 
 object Testdotty_i3149 {
   compiletimeHasNestedChildren[Foo](
-    "Foo.Child1",
-    "Test.Child2$1" // TODO check name in TASTy
+    "tastytest.dottyi3149.Foo.Bar",
+    "tastytest.dottyi3149.Foo.$localSealedChildProxy$1", // workaround to represent "tastytest.dottyi3149.Test.Bar$1",
+    "tastytest.dottyi3149.Test.O.Bar",
+    "tastytest.dottyi3149.Test.C.Bar"
   )
 }

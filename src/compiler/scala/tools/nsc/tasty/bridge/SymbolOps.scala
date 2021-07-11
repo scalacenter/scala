@@ -68,12 +68,12 @@ trait SymbolOps { self: TastyUniverse =>
 
   implicit final class SymbolDecorator(val sym: Symbol) {
 
-    def isScala3Inline: Boolean = repr.originalFlagSet.is(Inline)
-    def isScala2Macro: Boolean = repr.originalFlagSet.is(FlagSets.Scala2Macro)
-    def isTraitParamAccessor: Boolean = sym.owner.isTrait && repr.originalFlagSet.is(FieldAccessor|ParamSetter)
+    def isScala3Inline: Boolean = repr.tflags.is(Inline)
+    def isScala2Macro: Boolean = repr.tflags.is(FlagSets.Scala2Macro)
+    def isTraitParamAccessor: Boolean = sym.owner.isTrait && repr.tflags.is(FieldAccessor|ParamSetter)
 
     def isParamGetter: Boolean =
-      sym.isMethod && sym.repr.originalFlagSet.is(FlagSets.ParamGetter)
+      sym.isMethod && sym.repr.tflags.is(FlagSets.ParamGetter)
 
     /** A computed property that should only be called on a symbol which is known to have been initialised by the
      *  Tasty Unpickler and is not yet completed.

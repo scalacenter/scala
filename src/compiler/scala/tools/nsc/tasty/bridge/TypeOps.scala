@@ -128,14 +128,23 @@ trait TypeOps { self: TastyUniverse =>
      */
     object DefaultInfo extends TastyRepr {
       override def isTrivial: Boolean = true
-      def originalFlagSet: TastyFlagSet = EmptyTastyFlags
+      def tflags: TastyFlagSet = EmptyTastyFlags
     }
 
-    private[bridge] def CopyInfo(underlying: u.TermSymbol, originalFlagSet: TastyFlagSet)(implicit ctx: Context): TastyRepr =
+    private[bridge] def CopyInfo(
+        underlying: u.TermSymbol,
+        originalFlagSet: TastyFlagSet
+    )(implicit ctx: Context): TastyRepr =
       new CopyCompleter(underlying, originalFlagSet)
 
-    private[bridge] def SingletonEnumClassInfo(enumValue: u.TermSymbol, originalFlagSet: TastyFlagSet)(implicit ctx: Context): TastyRepr =
-      new EnumCompleter(enumValue, originalFlagSet)
+    private[bridge] def SingletonEnumClassInfo(
+        enumValue: u.TermSymbol,
+        originalFlagSet: TastyFlagSet
+    )(implicit ctx: Context): TastyRepr =
+      new SingletonEnumModuleClassCompleter(enumValue, originalFlagSet)
+
+    private[bridge] def LocalSealedChildProxyInfo(parent: Symbol)(implicit ctx: Context): Type =
+      new LocalSealedChildProxyCompleter(parent)
 
     def OpaqueTypeToBounds(tpe: Type): (Type, Type) = tpe match {
       case u.PolyType(tparams, tpe) =>
@@ -433,14 +442,17 @@ trait TypeOps { self: TastyUniverse =>
   private[TypeOps] val NoSymbolFn = (_: Context) => u.NoSymbol
 
   sealed abstract trait TastyRepr extends u.Type {
-    def originalFlagSet: TastyFlagSet
-    final def tastyOnlyFlags: TastyFlagSet = originalFlagSet & FlagSets.TastyOnlyFlags
+    def tflags: TastyFlagSet
+    final def unsupportedFlags: TastyFlagSet = tflags & FlagSets.TastyOnlyFlags
   }
 
-  abstract class TastyCompleter(isClass: Boolean, final val originalFlagSet: TastyFlagSet)(implicit
-      capturedCtx: Context) extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
-
+  abstract class TastyCompleter(isClass: Boolean, tflags: TastyFlagSet)(implicit ctx: Context)
+      extends BaseTastyCompleter(tflags) {
     override final val decls: u.Scope = if (isClass) u.newScope else u.EmptyScope
+  }
+
+  abstract class BaseTastyCompleter(final val tflags: TastyFlagSet)(implicit capturedCtx: Context)
+      extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
 
     override final def load(sym: Symbol): Unit =
       complete(sym)
@@ -455,21 +467,36 @@ trait TypeOps { self: TastyUniverse =>
     def computeInfo(sym: Symbol)(implicit ctx: Context): Unit
   }
 
-  private[TypeOps] class CopyCompleter(underlying: u.TermSymbol, final val originalFlagSet: TastyFlagSet)(implicit
-      capturedCtx: Context
-  ) extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
-    override final def complete(sym: Symbol): Unit = {
+  private[TypeOps] final class CopyCompleter(
+      underlying: u.TermSymbol,
+      tflags: TastyFlagSet
+  )(implicit ctx: Context)
+      extends BaseTastyCompleter(tflags) {
+    def computeInfo(sym: Symbol)(implicit ctx: Context): Unit = {
       underlying.ensureCompleted(isCopy = true)
       sym.info = underlying.tpe
       underlying.attachments.all.foreach(sym.updateAttachment(_))
     }
   }
 
-  private[TypeOps] class EnumCompleter(enumValue: u.TermSymbol, final val originalFlagSet: TastyFlagSet)(implicit
-      capturedCtx: Context
-  ) extends u.LazyType with TastyRepr with u.FlagAgnosticCompleter {
-    override final def complete(sym: Symbol): Unit = {
+  /** This completer ensures that if the "fake" singleton enum module class
+   *  is completed first, that it completes the module symbol which
+   *  then completes the module class.
+   */
+  private[TypeOps] class SingletonEnumModuleClassCompleter(
+      enumValue: u.TermSymbol,
+      tflags: TastyFlagSet
+  )(implicit ctx: Context)
+      extends BaseTastyCompleter(tflags) {
+    def computeInfo(sym: Symbol)(implicit ctx: Context): Unit = {
       enumValue.ensureCompleted(isEnum = true)
+    }
+  }
+
+  private[TypeOps] class LocalSealedChildProxyCompleter(parent: Symbol)(implicit ctx: Context)
+      extends BaseTastyCompleter(Private | Local) {
+    def computeInfo(sym: Symbol)(implicit ctx: Context): Unit = {
+      sym.info = defn.ClassInfoType(parent.tpe_* :: Nil, sym)
     }
   }
 
