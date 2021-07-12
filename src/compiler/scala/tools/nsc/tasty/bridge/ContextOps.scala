@@ -141,7 +141,7 @@ trait ContextOps { self: TastyUniverse =>
             // - test/tasty/neg/src-2/Testdotty_i3149_fail.scala
             // TODO [tasty] - fix assumption in compiler that sealed children cannot
             // contain the parent class
-            ctx.newLocalSealedChildProxy(sym, defn.LocalSealedChildProxyInfo(sym))
+            ctx.newLocalSealedChildProxy(sym)
           }
           else {
             child0
@@ -270,11 +270,16 @@ trait ContextOps { self: TastyUniverse =>
       info  = info
     )
 
-    final def newLocalSealedChildProxy(cls: Symbol, info: Type): Symbol = cls.primaryConstructor.newClassSymbol(
-      name = u.freshTypeName("$localSealedChildProxy$")(u.currentFreshNameCreator),
-      pos = u.NoPosition,
-      newFlags = FlagSets.Creation.PrivateLocal,
-    ).setInfo(info)
+    final def newLocalSealedChildProxy(cls: Symbol): Symbol = {
+      val tflags = Private | Local
+      unsafeNewClassSymbol(
+        owner = cls,
+        typeName = TastyName.SimpleName(cls.fullName('$') + "$$localSealedChildProxy").toTypeName,
+        flags = tflags,
+        info = defn.LocalSealedChildProxyInfo(cls, tflags),
+        privateWithin = u.NoSymbol
+      )
+    }
 
     final def findRootSymbol(roots: Set[Symbol], name: TastyName): Option[Symbol] = {
       import TastyName.TypeName
@@ -451,15 +456,6 @@ trait ContextOps { self: TastyUniverse =>
 
     final def enterClassCompletion(): Symbol = {
       val cls = globallyVisibleOwner.asClass
-      // val assumedSelfType = {
-      //   if (cls.is(Object) && cls.owner.isClass) {
-      //     cls.sourceModule.ensureCompleted() // todo add modifier
-      //     defn.SingleType(cls.owner.thisType, cls.sourceModule)
-      //   }
-      //   else {
-      //     u.NoType
-      //   }
-      // }
       val assumedSelfSym = {
         if (cls.is(Object) && cls.owner.isClass) {
           cls.sourceModule
@@ -468,7 +464,7 @@ trait ContextOps { self: TastyUniverse =>
           u.NoSymbol
         }
       }
-      cls.info = u.ClassInfoType(cls.repr.parents, cls.repr.decls, assumedSelfSym)//assumedSelfType.typeSymbolDirect)
+      cls.info = u.ClassInfoType(cls.repr.parents, cls.repr.decls, assumedSelfSym)
       cls
     }
 

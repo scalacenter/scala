@@ -163,8 +163,8 @@ trait TypeOps { self: TastyUniverse =>
     )(implicit ctx: Context): TastyRepr =
       new SingletonEnumModuleClassCompleter(enumValue, originalFlagSet)
 
-    private[bridge] def LocalSealedChildProxyInfo(parent: Symbol)(implicit ctx: Context): Type =
-      new LocalSealedChildProxyCompleter(parent)
+    private[bridge] def LocalSealedChildProxyInfo(parent: Symbol, tflags: TastyFlagSet)(implicit ctx: Context): Type =
+      new LocalSealedChildProxyCompleter(parent, tflags)
 
     def OpaqueTypeToBounds(tpe: Type): (Type, Type) = tpe match {
       case u.PolyType(tparams, tpe) =>
@@ -513,8 +513,11 @@ trait TypeOps { self: TastyUniverse =>
     }
   }
 
-  private[TypeOps] class LocalSealedChildProxyCompleter(parent: Symbol)(implicit ctx: Context)
-      extends BaseTastyCompleter(Private | Local) {
+  private[TypeOps] class LocalSealedChildProxyCompleter(
+      parent: Symbol,
+      tflags: TastyFlagSet
+  )(implicit ctx: Context)
+      extends BaseTastyCompleter(tflags) {
     def computeInfo(sym: Symbol)(implicit ctx: Context): Unit = {
       sym.info = defn.ClassInfoType(parent.tpe_* :: Nil, sym)
     }

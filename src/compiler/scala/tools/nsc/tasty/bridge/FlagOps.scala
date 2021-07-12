@@ -33,7 +33,6 @@ trait FlagOps { self: TastyUniverse =>
       val ObjectDef: TastyFlagSet = Object | Lazy | Final | Stable
       val ObjectClassDef: TastyFlagSet = Object | Final
       val Default: u.FlagSet = newSymbolFlagSet(EmptyTastyFlags)
-      val PrivateLocal: u.FlagSet = newSymbolFlagSet(Private | Local)
       val BoundedType: u.FlagSet = newSymbolFlagSet(Deferred)
     }
     def withAccess(flags: TastyFlagSet, inheritedAccess: TastyFlagSet): TastyFlagSet =
