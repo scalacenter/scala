@@ -203,18 +203,18 @@ trait ContextOps { self: TastyUniverse =>
     )
 
     @inline final def trace[T](info: => TraceInfo[T])(op: => T): T = {
-      if (u.settings.YdebugTasty) {
-        initialContext.trace { stack =>
-          val i = info
-          val id = stack.reverse.mkString("[", " ", ")")
-          val modStr = (
-            if (i.modifiers.isEmpty) ""
-            else " " + green(i.modifiers.mkString("[", ",", "]"))
-          )
-          logImpl(s"${yellow(s"$id")} ${cyan(s"<<< ${i.query}:")} ${magenta(i.qual)}$modStr")
-          op.tap(eval => logImpl(s"${yellow(s"$id")} ${cyan(s">>>")} ${magenta(i.res(eval))}$modStr"))
-        }
+
+      def withTrace(info: => TraceInfo[T], op: => T)(traceId: String): T = {
+        val i = info
+        val modStr = (
+          if (i.modifiers.isEmpty) ""
+          else " " + green(i.modifiers.mkString("[", ",", "]"))
+        )
+        logImpl(s"${yellow(s"$traceId")} ${cyan(s"<<< ${i.query}:")} ${magenta(i.qual)}$modStr")
+        op.tap(eval => logImpl(s"${yellow(s"$traceId")} ${cyan(s">>>")} ${magenta(i.res(eval))}$modStr"))
       }
+
+      if (u.settings.YdebugTasty) initialContext.addFrame(withTrace(info, op))
       else op
     }
 
@@ -596,17 +596,33 @@ trait ContextOps { self: TastyUniverse =>
     def mode: TastyMode = EmptyTastyMode
     def owner: Symbol = topLevelClass.owner
 
-    private[this] var _traceId: Long = -1L
-    private[this] var _trace: List[Long] = Nil
+    private class TraceFrame(val id: Int, val next: TraceFrame) {
 
-    private[ContextOps] def trace[T](op: List[Long] => T): T = {
-      val oldTrace  = _trace
-      val nextId    = _traceId + 1
-      val nextTrace = nextId :: oldTrace
-      _trace   = nextTrace
-      _traceId = nextId
-      try op(nextTrace)
-      finally _trace = oldTrace
+      var nextChild: Int = 0
+
+      def show: String = {
+        val buf = mutable.ArrayDeque.empty[String]
+        var cur = this
+        while (cur.id != -1) {
+          buf.prepend(cur.id.toString)
+          cur = cur.next
+        }
+        buf.mkString("[", " ", ")")
+      }
+
+    }
+
+    private[this] var _trace: TraceFrame = new TraceFrame(id = -1, next = null)
+
+    private[ContextOps] def addFrame[T](op: String => T): T = {
+      val oldFrame  = _trace
+      val newFrame = new TraceFrame(id = oldFrame.nextChild, next = oldFrame)
+      _trace = newFrame
+      try op(newFrame.show)
+      finally {
+        _trace = oldFrame
+        _trace.nextChild += 1
+      }
     }
 
     private[this] var mySymbolsToForceAnnots: mutable.LinkedHashSet[Symbol] = _
