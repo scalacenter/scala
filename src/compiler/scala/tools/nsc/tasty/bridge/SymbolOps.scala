@@ -14,7 +14,7 @@ package scala.tools.nsc.tasty.bridge
 
 import scala.tools.nsc.tasty.SafeEq
 
-import scala.tools.nsc.tasty.{TastyUniverse, TastyModes}, TastyModes._
+import scala.tools.nsc.tasty.{TastyUniverse, TastyModes, ForceKinds}, TastyModes._, ForceKinds._
 import scala.tools.tasty.{TastyName, Signature, TastyFlags}, TastyName.SignedName, Signature.MethodSignature, TastyFlags._
 import scala.tools.tasty.ErasedTypeRef
 
@@ -38,7 +38,6 @@ trait SymbolOps { self: TastyUniverse =>
 
   /** Fetch the symbol of a path type without forcing the symbol,
    * `NoSymbol` if not a path.
-   * @param tpe should be a path type
    */
   @tailrec
   private[bridge] final def symOfType(tpe: Type): Symbol = tpe match {
@@ -48,21 +47,24 @@ trait SymbolOps { self: TastyUniverse =>
     case tpe: u.ConstantType => symOfType(tpe.value.tpe)
     case tpe: u.ClassInfoType => tpe.typeSymbol
     case tpe: u.RefinedType0 => tpe.typeSymbol
+    case tpe: u.ExistentialType => symOfType(tpe.underlying)
     case _ => u.NoSymbol
   }
 
-  private[bridge] final def deepComplete(tpe: Type, isSpace: Boolean = false, isChild: Boolean = false, isDeep: Boolean = false)(implicit ctx: Context): Unit = {
-    val asTerm = tpe.termSymbol
-    if (asTerm ne u.NoSymbol) {
-      if (asTerm.is(Object)) {
-        asTerm.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
-        asTerm.moduleClass.ensureCompleted(isDeep = true, isSpace = isSpace, isChild = isChild)
-      }
-      else {
-        ctx.log(s"deep complete on non module ${showSym(asTerm)}, not taking action")
-      }
-    } else {
-      tpe.typeSymbol.ensureCompleted(isDeep = isDeep, isSpace = isSpace, isChild = isChild)
+  private[bridge] final def deepComplete(tpe: Type)(implicit ctx: Context): Unit = {
+    symOfType(tpe) match {
+      case u.NoSymbol =>
+        ctx.log(s"could not retrieve symbol from type ${showType(tpe)}")
+      case termSym if termSym.isTerm =>
+        if (termSym.is(Object)) {
+          termSym.ensureCompleted(SpaceForce)
+          termSym.moduleClass.ensureCompleted(DeepForce | SpaceForce)
+        }
+        else {
+          ctx.log(s"deep complete on non-module term ${showSym(termSym)}, not taking action")
+        }
+      case typeSym =>
+        typeSym.ensureCompleted(SpaceForce)
     }
   }
 
@@ -90,19 +92,10 @@ trait SymbolOps { self: TastyUniverse =>
       }
     }
 
-    def ensureCompleted(
-      isAnnotCtor: Boolean = false,
-      isDeep: Boolean = false,
-      isCompleteOwner: Boolean = false,
-      isOverload: Boolean = false,
-      isCopy: Boolean = false,
-      isSpace: Boolean = false,
-      isChild: Boolean = false,
-      isEnum: Boolean = false,
-    )(implicit ctx: Context): Unit = {
+    def ensureCompleted(forceKinds: ForceKinds)(implicit ctx: Context): Unit = {
       val raw = sym.rawInfo
       if (raw.isInstanceOf[u.LazyType]) {
-        ctx.trace(traceForceInfo(sym, isAnnotCtor, isDeep, isCompleteOwner, isOverload, isCopy, isSpace, isChild, isEnum)) {
+        ctx.trace(traceForceInfo(sym, forceKinds)) {
           sym.info
           sym.annotations.foreach(_.completeInfo())
         }
@@ -113,28 +106,20 @@ trait SymbolOps { self: TastyUniverse =>
 
     private def traceForceInfo(
       sym: Symbol,
-      isAnnotCtor: Boolean,
-      isDeep: Boolean,
-      isCompleteOwner: Boolean,
-      isOverload: Boolean,
-      isCopy: Boolean,
-      isSpace: Boolean,
-      isChild: Boolean,
-      isEnum: Boolean
+      forceKinds: ForceKinds
     )(implicit ctx: Context) = TraceInfo[Unit](
       query = "force symbol info",
       qual = s"${showSym(sym)} in context ${showSym(ctx.owner)}",
       res = _ => s"${showSym(sym)} was forced",
       modifiers = {
         var mods = List.empty[String]
-        if (isAnnotCtor) mods ::= "reading annotation constructor"
-        if (isDeep) mods ::= "deep"
-        if (isCompleteOwner) mods ::= "class owner is required"
-        if (isOverload) mods ::= "overload resolution"
-        if (isCopy) mods ::= "copying its info"
-        if (isSpace) mods ::= "space"
-        if (isChild) mods ::= "forcing sealed child"
-        if (isEnum) mods ::= "forcing enum value from fake object"
+        if (forceKinds.is(AnnotCtor)) mods ::= "reading annotation constructor"
+        if (forceKinds.is(DeepForce)) mods ::= "deep"
+        if (forceKinds.is(CompleteOwner)) mods ::= "class owner is required"
+        if (forceKinds.is(OverloadedSym)) mods ::= "overload resolution"
+        if (forceKinds.is(CopySym)) mods ::= "copying its info"
+        if (forceKinds.is(SpaceForce)) mods ::= "space"
+        if (forceKinds.is(EnumProxy)) mods ::= "forcing enum value from fake object"
         mods
       }
     )
@@ -158,7 +143,7 @@ trait SymbolOps { self: TastyUniverse =>
       termParamss
 
   def namedMemberOfType(space: Type, tname: TastyName)(implicit ctx: Context): Symbol = {
-    deepComplete(space, isSpace = true)
+    deepComplete(space)
     tname match {
       case SignedName(qual, sig, target) => signedMemberOfSpace(space, qual, sig.map(_.encode), target)
       case _                             => memberOfSpace(space, tname)
@@ -234,7 +219,7 @@ trait SymbolOps { self: TastyUniverse =>
         }
         def compareSym(sym: Symbol): Boolean = sym match {
           case sym: u.MethodSymbol =>
-            sym.ensureCompleted(isOverload = true)
+            sym.ensureCompleted(OverloadedSym)
             // TODO [tasty]: we should cache signatures for symbols and compare against `sig`
             val meth0 = u.unwrapWrapperTypes(sym.tpe.asSeenFrom(space, sym.owner))
             val paramSyms = meth0.paramss.flatten

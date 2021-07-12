@@ -12,7 +12,7 @@
 
 package scala.tools.nsc.tasty.bridge
 
-import scala.tools.nsc.tasty.{TastyUniverse, SafeEq, TastyModes}, TastyModes._
+import scala.tools.nsc.tasty.{TastyUniverse, SafeEq, TastyModes, ForceKinds}, TastyModes._, ForceKinds._
 
 import scala.tools.tasty.{TastyName, ErasedTypeRef, TastyFlags}, TastyFlags._
 
@@ -78,12 +78,32 @@ trait TypeOps { self: TastyUniverse =>
     def meth(tparams: List[Symbol], tpe: u.MethodType) = parameterised(tparams, "meth") { paramStr =>
       s"$paramStr$tpe"
     }
+    def preStr(pre: Type): String = {
+      val preSym = symOfType(pre)
+      if (isSymbol(preSym)) s"${preSym.fullName}." else ""
+    }
     tpe match {
       case tpe: u.ClassInfoType                      => cls(Nil, tpe)
       case u.PolyType(tparams, tpe: u.ClassInfoType) => cls(tparams, tpe)
       case u.PolyType(tparams, tpe: u.MethodType)    => meth(tparams, tpe)
       case tpe: u.MethodType                         => meth(Nil, tpe)
-      case tpe                                       => prefixed("tpe") { s"$tpe" }
+      case tpe: u.ThisType                           => prefixed("path") { s"${tpe.sym.fullName}.this" }
+
+      case tpe: u.SingleType =>
+        prefixed("path") { s"${preStr(tpe.prefix)}${tpe.sym.name}.type" }
+
+      case tpe: u.TypeRef =>
+        val pre = preStr(tpe.prefix)
+        if (tpe.sym.is(Object)) prefixed("path") {
+          s"$pre${tpe.sym.name}.type"
+        }
+        else prefixed("tpelazy") {
+          val argsStrs = tpe.args.map(showType(_, wrap = false))
+          val argsStr = if (argsStrs.nonEmpty) argsStrs.mkString("[", ", ", "]") else ""
+          s"$pre${tpe.sym.name}$argsStr"
+        }
+
+      case tpe => prefixed("tpe") { s"$tpe" }
     }
   }
 
@@ -473,7 +493,7 @@ trait TypeOps { self: TastyUniverse =>
   )(implicit ctx: Context)
       extends BaseTastyCompleter(tflags) {
     def computeInfo(sym: Symbol)(implicit ctx: Context): Unit = {
-      underlying.ensureCompleted(isCopy = true)
+      underlying.ensureCompleted(CopySym)
       sym.info = underlying.tpe
       underlying.attachments.all.foreach(sym.updateAttachment(_))
     }
@@ -489,7 +509,7 @@ trait TypeOps { self: TastyUniverse =>
   )(implicit ctx: Context)
       extends BaseTastyCompleter(tflags) {
     def computeInfo(sym: Symbol)(implicit ctx: Context): Unit = {
-      enumValue.ensureCompleted(isEnum = true)
+      enumValue.ensureCompleted(EnumProxy)
     }
   }
 

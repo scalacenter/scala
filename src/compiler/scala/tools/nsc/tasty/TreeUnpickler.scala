@@ -12,7 +12,9 @@
 
 package scala.tools.nsc.tasty
 
-import scala.tools.tasty.{TastyRefs, TastyReader, TastyName, TastyFormat, TastyFlags}, TastyRefs._, TastyFlags._, TastyFormat._
+import scala.tools.tasty.{TastyRefs, TastyReader, TastyName, TastyFormat, TastyFlags}
+import TastyRefs._, TastyFlags._, TastyFormat._
+import ForceKinds._
 
 import scala.annotation.switch
 import scala.collection.mutable
@@ -850,7 +852,7 @@ class TreeUnpickler[Tasty <: TastyUniverse](
         val allowedClassFlags = allowedShared | Open | Transparent
         if (sym.isClass) {
           checkUnsupportedFlags(repr.unsupportedFlags &~ allowedClassFlags)
-          sym.owner.ensureCompleted(isCompleteOwner = true)
+          sym.owner.ensureCompleted(CompleteOwner)
           readTemplate()(localCtx)
         }
         else {
@@ -878,10 +880,6 @@ class TreeUnpickler[Tasty <: TastyUniverse](
       }
 
       def initialize(localCtx: Context)(implicit ctx: Context): Unit = ctx.trace(traceCompletion(symAddr, sym)) {
-        def dumpTrace: String =
-          Thread.currentThread().getStackTrace().drop(2).take(100).map(_.toString()).mkString("\n  ", "\n  ", "")
-        if (tname.toString == "Red")
-          ctx.log(s"initialise$dumpTrace")
         sym.rawInfo match {
           case repr: TastyRepr =>
             tag match {
